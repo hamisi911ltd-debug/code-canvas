@@ -17,11 +17,35 @@ import { Route as CommunityRouteImport } from './routes/community'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TracksRouteImport } from './routes/tracks'
 import { Route as ResearchSlugRouteImport } from './routes/research.$slug'
 import { Route as LibraryModuleSlugRouteImport } from './routes/library.$moduleSlug'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
+import { Route as TracksTrackSlugRouteImport } from './routes/tracks.$trackSlug'
 import { Route as LearnCourseSlugLessonIdRouteImport } from './routes/learn.$courseSlug.$lessonId'
+import { Route as ExamTrackSlugRouteImport } from './routes/exam.$trackSlug'
+import { Route as TracksTrackSlugLessonIdRouteImport } from './routes/tracks.$trackSlug.$lessonId'
 
+const TracksRoute = TracksRouteImport.update({
+  id: '/tracks',
+  path: '/tracks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TracksTrackSlugRoute = TracksTrackSlugRouteImport.update({
+  id: '/$trackSlug',
+  path: '/$trackSlug',
+  getParentRoute: () => TracksRoute,
+} as any)
+const TracksTrackSlugLessonIdRoute = TracksTrackSlugLessonIdRouteImport.update({
+  id: '/$lessonId',
+  path: '/$lessonId',
+  getParentRoute: () => TracksTrackSlugRoute,
+} as any)
+const ExamTrackSlugRoute = ExamTrackSlugRouteImport.update({
+  id: '/exam/$trackSlug',
+  path: '/exam/$trackSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResearchRoute = ResearchRouteImport.update({
   id: '/research',
   path: '/research',
@@ -92,10 +116,14 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
+  '/tracks': typeof TracksRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
+  '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/exam/$trackSlug': typeof ExamTrackSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -106,10 +134,14 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
+  '/tracks': typeof TracksRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
+  '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/exam/$trackSlug': typeof ExamTrackSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -121,10 +153,14 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
+  '/tracks': typeof TracksRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
+  '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/exam/$trackSlug': typeof ExamTrackSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,10 +173,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/library'
     | '/research'
+    | '/tracks'
     | '/courses/$slug'
     | '/library/$moduleSlug'
     | '/research/$slug'
+    | '/tracks/$trackSlug'
+    | '/tracks/$trackSlug/$lessonId'
     | '/learn/$courseSlug/$lessonId'
+    | '/exam/$trackSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -151,10 +191,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/library'
     | '/research'
+    | '/tracks'
     | '/courses/$slug'
     | '/library/$moduleSlug'
     | '/research/$slug'
+    | '/tracks/$trackSlug'
+    | '/tracks/$trackSlug/$lessonId'
     | '/learn/$courseSlug/$lessonId'
+    | '/exam/$trackSlug'
   id:
     | '__root__'
     | '/'
@@ -165,10 +209,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/library'
     | '/research'
+    | '/tracks'
     | '/courses/$slug'
     | '/library/$moduleSlug'
     | '/research/$slug'
+    | '/tracks/$trackSlug'
+    | '/tracks/$trackSlug/$lessonId'
     | '/learn/$courseSlug/$lessonId'
+    | '/exam/$trackSlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -180,7 +228,9 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LibraryRoute: typeof LibraryRouteWithChildren
   ResearchRoute: typeof ResearchRouteWithChildren
+  TracksRoute: typeof TracksRouteWithChildren
   LearnCourseSlugLessonIdRoute: typeof LearnCourseSlugLessonIdRoute
+  ExamTrackSlugRoute: typeof ExamTrackSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +319,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnCourseSlugLessonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tracks': {
+      id: '/tracks'
+      path: '/tracks'
+      fullPath: '/tracks'
+      preLoaderRoute: typeof TracksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tracks/$trackSlug': {
+      id: '/$trackSlug'
+      path: '/$trackSlug'
+      fullPath: '/tracks/$trackSlug'
+      preLoaderRoute: typeof TracksTrackSlugRouteImport
+      parentRoute: typeof TracksRoute
+    }
+    '/tracks/$trackSlug/$lessonId': {
+      id: '/$lessonId'
+      path: '/$lessonId'
+      fullPath: '/tracks/$trackSlug/$lessonId'
+      preLoaderRoute: typeof TracksTrackSlugLessonIdRouteImport
+      parentRoute: typeof TracksTrackSlugRoute
+    }
+    '/exam/$trackSlug': {
+      id: '/exam/$trackSlug'
+      path: '/exam/$trackSlug'
+      fullPath: '/exam/$trackSlug'
+      preLoaderRoute: typeof ExamTrackSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -306,6 +384,28 @@ const ResearchRouteWithChildren = ResearchRoute._addFileChildren(
   ResearchRouteChildren,
 )
 
+interface TracksTrackSlugRouteChildren {
+  TracksTrackSlugLessonIdRoute: typeof TracksTrackSlugLessonIdRoute
+}
+
+const TracksTrackSlugRouteChildren: TracksTrackSlugRouteChildren = {
+  TracksTrackSlugLessonIdRoute: TracksTrackSlugLessonIdRoute,
+}
+
+const TracksTrackSlugRouteWithChildren =
+  TracksTrackSlugRoute._addFileChildren(TracksTrackSlugRouteChildren)
+
+interface TracksRouteChildren {
+  TracksTrackSlugRoute: typeof TracksTrackSlugRouteWithChildren
+}
+
+const TracksRouteChildren: TracksRouteChildren = {
+  TracksTrackSlugRoute: TracksTrackSlugRouteWithChildren,
+}
+
+const TracksRouteWithChildren =
+  TracksRoute._addFileChildren(TracksRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -315,7 +415,9 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LibraryRoute: LibraryRouteWithChildren,
   ResearchRoute: ResearchRouteWithChildren,
+  TracksRoute: TracksRouteWithChildren,
   LearnCourseSlugLessonIdRoute: LearnCourseSlugLessonIdRoute,
+  ExamTrackSlugRoute: ExamTrackSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

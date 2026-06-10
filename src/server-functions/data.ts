@@ -736,3 +736,138 @@ export const deletePost = createServerFn({ method: 'POST' })
     const db = getDB()
     await db.prepare('DELETE FROM community_posts WHERE id=?').bind(data.id).run()
   })
+
+// ── TRACKS / QUIZ / EXAM ──────────────────────────────────────────────────────
+
+export const submitQuiz = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { lessonId: string; score: number; passed: boolean })
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const db = getDB()
+    await db
+      .prepare('INSERT OR REPLACE INTO quiz_results (id, user_id, lesson_id, score, passed) VALUES (?, ?, ?, ?, ?)')
+      .bind(newId(), user.id, data.lessonId, data.score, data.passed ? 1 : 0)
+      .run()
+  })
+
+export const getQuizResult = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { lessonId: string })
+  .handler(async ({ data }) => {
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+    if (!sessionUser) return null
+    const db = getDB()
+    const row = await db
+      .prepare('SELECT score, passed FROM quiz_results WHERE user_id = ? AND lesson_id = ?')
+      .bind(sessionUser.id, data.lessonId)
+      .first<{ score: number; passed: number }>()
+    return row ? { score: row.score, passed: !!row.passed } : null
+  })
+
+export const submitExam = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { categoryId: string; score: number })
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const db = getDB()
+    await db
+      .prepare('INSERT OR REPLACE INTO certifications (id, user_id, category_id, score) VALUES (?, ?, ?, ?)')
+      .bind(newId(), user.id, data.categoryId, data.score)
+      .run()
+  })
+
+export const getCertifications = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+  const sid = getCookie('vl_session')
+  const sessionUser = await getSession(sid)
+  if (!sessionUser) return [] as Array<{ id: string; category_id: string; score: number; issued_at: string; categories: { name: string; slug: string; icon: string | null } }>
+  const db = getDB()
+  const { results } = await db
+    .prepare(
+      `SELECT cert.*, cat.name as category_name, cat.slug as category_slug, cat.icon as category_icon
+       FROM certifications cert JOIN categories cat ON cert.category_id = cat.id
+       WHERE cert.user_id = ? ORDER BY cert.issued_at DESC`,
+    )
+    .bind(sessionUser.id)
+    .all<Record<string, unknown>>()
+  return (results ?? []).map((c) => ({
+    ...c,
+    categories: { name: c.category_name as string, slug: c.category_slug as string, icon: c.category_icon as string | null },
+  }))
+})
+
+export const getTrackData = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { trackSlug: string })
+  .handler(async ({ data }) => {
+    const db = getDB()
+    const category = await db.prepare('SELECT * FROM categories WHERE slug = ?').bind(data.trackSlug).first<Record<string, unknown>>()
+    if (!category) return null
+
+    const { results: coursesRaw } = await db
+      .prepare('SELECT * FROM courses WHERE category_id = ? AND published = 1 ORDER BY created_at')
+      .bind(category.id)
+      .all<Record<string, unknown>>()
+
+    const courseIds = (coursesRaw ?? []).map((c) => c.id as string)
+    const lessonsByCourse: Record<string, Record<string, unknown>[]> = {}
+    let allLessonIds: string[] = []
+
+    if (courseIds.length) {
+      const ph = courseIds.map(() => '?').join(',')
+      const { results: lessonsRaw } = await db
+        .prepare(`SELECT * FROM lessons WHERE course_id IN (${ph}) ORDER BY course_id, position`)
+        .bind(...courseIds)
+        .all<Record<string, unknown>>()
+      for (const l of lessonsRaw ?? []) {
+        const cid = l.course_id as string
+        if (!lessonsByCourse[cid]) lessonsByCourse[cid] = []
+        lessonsByCourse[cid].push({ ...l, quiz: parseJSON(l.quiz as string, null) })
+        allLessonIds.push(l.id as string)
+      }
+    }
+
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+    let completedSet = new Set<string>()
+    let certification: Record<string, unknown> | null = null
+    let quizResultMap: Record<string, { score: number; passed: boolean }> = {}
+
+    if (sessionUser && allLessonIds.length) {
+      const ph2 = allLessonIds.map(() => '?').join(',')
+      const [progRes, qrRes] = await Promise.all([
+        db.prepare(`SELECT lesson_id FROM lesson_progress WHERE user_id = ? AND lesson_id IN (${ph2})`).bind(sessionUser.id, ...allLessonIds).all<{ lesson_id: string }>(),
+        db.prepare(`SELECT lesson_id, score, passed FROM quiz_results WHERE user_id = ? AND lesson_id IN (${ph2})`).bind(sessionUser.id, ...allLessonIds).all<{ lesson_id: string; score: number; passed: number }>(),
+      ])
+      completedSet = new Set((progRes.results ?? []).map((r) => r.lesson_id))
+      quizResultMap = Object.fromEntries(
+        (qrRes.results ?? []).map((r) => [r.lesson_id, { score: r.score, passed: !!r.passed }]),
+      )
+      certification = (await db.prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?').bind(sessionUser.id, category.id).first<Record<string, unknown>>()) ?? null
+    }
+
+    const exam = await db.prepare('SELECT * FROM module_exams WHERE category_id = ?').bind(category.id).first<Record<string, unknown>>()
+
+    const courses = (coursesRaw ?? []).map((c) => {
+      const lessons = lessonsByCourse[c.id as string] ?? []
+      const completed = lessons.filter((l) => completedSet.has(l.id as string)).length
+      return {
+        ...c,
+        published: !!(c.published),
+        lessons,
+        totalLessons: lessons.length,
+        completedLessons: completed,
+        pct: lessons.length ? Math.round((completed / lessons.length) * 100) : 0,
+      }
+    })
+
+    const totalCompleted = allLessonIds.filter((id) => completedSet.has(id)).length
+    return {
+      category,
+      courses,
+      exam: exam ? { ...exam, questions: parseJSON(exam.questions as string, []) } : null,
+      certification: certification ?? null,
+      completedIds: Array.from(completedSet),
+      quizResults: quizResultMap,
+      totalLessons: allLessonIds.length,
+      totalCompleted,
+      overallPct: allLessonIds.length ? Math.round((totalCompleted / allLessonIds.length) * 100) : 0,
+    }
+  })
