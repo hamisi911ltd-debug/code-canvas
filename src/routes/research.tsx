@@ -1,17 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { PageShell } from "@/components/PageShell";
-import { Badge } from "@/components/ui/badge";
-import { FlaskConical, ArrowRight } from "lucide-react";
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { getResearchArticles } from '@/server-functions/data'
+import { PageShell } from '@/components/PageShell'
+import { Badge } from '@/components/ui/badge'
+import { FlaskConical, ArrowRight } from 'lucide-react'
 
-export const Route = createFileRoute("/research")({ component: ResearchList });
+export const Route = createFileRoute('/research')({ component: ResearchList })
 
 function ResearchList() {
   const { data: articles, isLoading } = useQuery({
-    queryKey: ["research"],
-    queryFn: async () => (await supabase.from("research_articles").select("*").eq("published", true).order("created_at", { ascending: false })).data ?? [],
-  });
+    queryKey: ['research'],
+    queryFn: () => getResearchArticles(),
+  })
 
   return (
     <PageShell>
@@ -34,8 +34,13 @@ function ResearchList() {
           </div>
         ) : (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {(articles ?? []).map((a) => (
-              <Link key={a.id} to="/research/$slug" params={{ slug: a.slug }} className="group rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition card-glass">
+            {(articles ?? []).map((a: any) => (
+              <Link
+                key={a.id}
+                to="/research/$slug"
+                params={{ slug: a.slug }}
+                className="group rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition card-glass"
+              >
                 <div className="aspect-video bg-gradient-to-br from-primary/20 via-accent/10 to-transparent">
                   {a.cover_image_url && <img src={a.cover_image_url} alt={a.title} className="w-full h-full object-cover" />}
                 </div>
@@ -57,5 +62,5 @@ function ResearchList() {
         )}
       </section>
     </PageShell>
-  );
+  )
 }

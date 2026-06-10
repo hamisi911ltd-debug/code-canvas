@@ -1,7 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "tanstack-start-app",
+  "name": "vlapp",
   "compatibility_date": "2025-09-24",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vibelearn",
+      "database_id": "af74b69a-89a8-4ea5-ab3d-f3edf681f1f9"
+    }
+  ]
 }

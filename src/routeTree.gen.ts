@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResearchRouteImport } from './routes/research'
+import { Route as LibraryRouteImport } from './routes/library'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as CommunityRouteImport } from './routes/community'
@@ -17,12 +18,18 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResearchSlugRouteImport } from './routes/research.$slug'
+import { Route as LibraryModuleSlugRouteImport } from './routes/library.$moduleSlug'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
 import { Route as LearnCourseSlugLessonIdRouteImport } from './routes/learn.$courseSlug.$lessonId'
 
 const ResearchRoute = ResearchRouteImport.update({
   id: '/research',
   path: '/research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -60,6 +67,11 @@ const ResearchSlugRoute = ResearchSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => ResearchRoute,
 } as any)
+const LibraryModuleSlugRoute = LibraryModuleSlugRouteImport.update({
+  id: '/$moduleSlug',
+  path: '/$moduleSlug',
+  getParentRoute: () => LibraryRoute,
+} as any)
 const CoursesSlugRoute = CoursesSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -78,8 +90,10 @@ export interface FileRoutesByFullPath {
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
+  '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
 }
@@ -90,8 +104,10 @@ export interface FileRoutesByTo {
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
+  '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
 }
@@ -103,8 +119,10 @@ export interface FileRoutesById {
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
+  '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
 }
@@ -117,8 +135,10 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/library'
     | '/research'
     | '/courses/$slug'
+    | '/library/$moduleSlug'
     | '/research/$slug'
     | '/learn/$courseSlug/$lessonId'
   fileRoutesByTo: FileRoutesByTo
@@ -129,8 +149,10 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/library'
     | '/research'
     | '/courses/$slug'
+    | '/library/$moduleSlug'
     | '/research/$slug'
     | '/learn/$courseSlug/$lessonId'
   id:
@@ -141,8 +163,10 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/library'
     | '/research'
     | '/courses/$slug'
+    | '/library/$moduleSlug'
     | '/research/$slug'
     | '/learn/$courseSlug/$lessonId'
   fileRoutesById: FileRoutesById
@@ -154,6 +178,7 @@ export interface RootRouteChildren {
   CommunityRoute: typeof CommunityRoute
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
+  LibraryRoute: typeof LibraryRouteWithChildren
   ResearchRoute: typeof ResearchRouteWithChildren
   LearnCourseSlugLessonIdRoute: typeof LearnCourseSlugLessonIdRoute
 }
@@ -165,6 +190,13 @@ declare module '@tanstack/react-router' {
       path: '/research'
       fullPath: '/research'
       preLoaderRoute: typeof ResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -216,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResearchSlugRouteImport
       parentRoute: typeof ResearchRoute
     }
+    '/library/$moduleSlug': {
+      id: '/library/$moduleSlug'
+      path: '/$moduleSlug'
+      fullPath: '/library/$moduleSlug'
+      preLoaderRoute: typeof LibraryModuleSlugRouteImport
+      parentRoute: typeof LibraryRoute
+    }
     '/courses/$slug': {
       id: '/courses/$slug'
       path: '/$slug'
@@ -244,6 +283,17 @@ const CoursesRouteChildren: CoursesRouteChildren = {
 const CoursesRouteWithChildren =
   CoursesRoute._addFileChildren(CoursesRouteChildren)
 
+interface LibraryRouteChildren {
+  LibraryModuleSlugRoute: typeof LibraryModuleSlugRoute
+}
+
+const LibraryRouteChildren: LibraryRouteChildren = {
+  LibraryModuleSlugRoute: LibraryModuleSlugRoute,
+}
+
+const LibraryRouteWithChildren =
+  LibraryRoute._addFileChildren(LibraryRouteChildren)
+
 interface ResearchRouteChildren {
   ResearchSlugRoute: typeof ResearchSlugRoute
 }
@@ -263,9 +313,20 @@ const rootRouteChildren: RootRouteChildren = {
   CommunityRoute: CommunityRoute,
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
+  LibraryRoute: LibraryRouteWithChildren,
   ResearchRoute: ResearchRouteWithChildren,
   LearnCourseSlugLessonIdRoute: LearnCourseSlugLessonIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

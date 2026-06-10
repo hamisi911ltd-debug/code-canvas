@@ -50,10 +50,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "VibeLearn — Learn to build with AI" },
+      { title: "vibelearn — Learn to build with AI" },
       { name: "description", content: "A modern tech learning platform. Vibecoding, frontend, backend, AI, and more — taught by builders for builders." },
-      { name: "author", content: "VibeLearn" },
-      { property: "og:title", content: "VibeLearn — Learn to build with AI" },
+      { name: "author", content: "vibelearn" },
+      { property: "og:title", content: "vibelearn — Learn to build with AI" },
       { property: "og:description", content: "Vibecoding and tech courses for the next generation of builders." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

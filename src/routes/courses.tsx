@@ -1,43 +1,39 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
-import { PageShell } from "@/components/PageShell";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
-import { Search, Play, BookOpen } from "lucide-react";
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { z } from 'zod'
+import { getCategories, getCourses } from '@/server-functions/data'
+import { PageShell } from '@/components/PageShell'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { useState } from 'react'
+import { Search, Play, BookOpen } from 'lucide-react'
 
-const search = z.object({ category: z.string().optional() });
-export const Route = createFileRoute("/courses")({
+const search = z.object({ category: z.string().optional() })
+export const Route = createFileRoute('/courses')({
   component: CoursesPage,
   validateSearch: (s) => search.parse(s),
-});
+})
 
 function CoursesPage() {
-  const { category } = Route.useSearch();
-  const [q, setQ] = useState("");
+  const { category } = Route.useSearch()
+  const [q, setQ] = useState('')
 
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => (await supabase.from("categories").select("*").order("name")).data ?? [],
-  });
+    queryKey: ['categories'],
+    queryFn: () => getCategories(),
+  })
 
   const { data: courses, isLoading } = useQuery({
-    queryKey: ["courses", category],
-    queryFn: async () => {
-      let qb = supabase.from("courses").select("*, categories(name, slug)").eq("published", true).order("created_at", { ascending: false });
-      if (category) {
-        const cat = (await supabase.from("categories").select("id").eq("slug", category).maybeSingle()).data;
-        if (cat?.id) qb = qb.eq("category_id", cat.id);
-      }
-      return (await qb).data ?? [];
-    },
-  });
+    queryKey: ['courses', category],
+    queryFn: () => getCourses({ data: { categorySlug: category } }),
+  })
 
-  const filtered = (courses ?? []).filter((c: any) =>
-    !q || c.title.toLowerCase().includes(q.toLowerCase()) || c.description?.toLowerCase().includes(q.toLowerCase())
-  );
+  const filtered = (courses ?? []).filter(
+    (c: any) =>
+      !q ||
+      c.title.toLowerCase().includes(q.toLowerCase()) ||
+      (c.description ?? '').toLowerCase().includes(q.toLowerCase()),
+  )
 
   return (
     <PageShell>
@@ -56,7 +52,10 @@ function CoursesPage() {
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6 py-10">
         <div className="flex flex-wrap gap-2 mb-8">
-          <Link to="/courses" className={`px-3 py-1.5 rounded-full text-sm border transition ${!category ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}>
+          <Link
+            to="/courses"
+            className={`px-3 py-1.5 rounded-full text-sm border transition ${!category ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
+          >
             All
           </Link>
           {(categories ?? []).map((c) => (
@@ -64,7 +63,7 @@ function CoursesPage() {
               key={c.id}
               to="/courses"
               search={{ category: c.slug }}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${category === c.slug ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50"}`}
+              className={`px-3 py-1.5 rounded-full text-sm border transition ${category === c.slug ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
             >
               {c.name}
             </Link>
@@ -83,7 +82,12 @@ function CoursesPage() {
         ) : (
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((c: any) => (
-              <Link key={c.id} to="/courses/$slug" params={{ slug: c.slug }} className="group rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition card-glass">
+              <Link
+                key={c.id}
+                to="/courses/$slug"
+                params={{ slug: c.slug }}
+                className="group rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition card-glass"
+              >
                 <div className="aspect-video relative bg-gradient-to-br from-primary/20 via-accent/10 to-transparent overflow-hidden">
                   {c.thumbnail_url ? (
                     <img src={c.thumbnail_url} alt={c.title} className="w-full h-full object-cover" />
@@ -95,7 +99,7 @@ function CoursesPage() {
                   <Badge className="absolute top-3 left-3 bg-background/80 backdrop-blur border-border capitalize">{c.level}</Badge>
                 </div>
                 <div className="p-5">
-                  <div className="text-xs text-primary uppercase tracking-wider">{c.categories?.name ?? "General"}</div>
+                  <div className="text-xs text-primary uppercase tracking-wider">{c.categories?.name ?? 'General'}</div>
                   <h3 className="mt-1 font-display text-lg font-semibold group-hover:text-primary transition">{c.title}</h3>
                   <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{c.description}</p>
                 </div>
@@ -105,5 +109,5 @@ function CoursesPage() {
         )}
       </section>
     </PageShell>
-  );
+  )
 }

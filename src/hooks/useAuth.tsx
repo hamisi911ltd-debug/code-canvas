@@ -1,56 +1,52 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getAuthState, signOutFn } from '@/server-functions/auth'
+import type { SessionUser } from '@/lib/auth'
 
-type AuthState = {
-  user: User | null;
-  session: Session | null;
-  isAdmin: boolean;
-  loading: boolean;
-  signOut: () => Promise<void>;
-  refreshRole: () => Promise<void>;
-};
+interface AuthContextValue {
+  user: SessionUser | null
+  isLoading: boolean
+  isAdmin: boolean
+  signOut: () => Promise<void>
+}
 
-const AuthContext = createContext<AuthState | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  isLoading: true,
+  isAdmin: false,
+  signOut: async () => {},
+})
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const qc = useQueryClient()
 
-  const loadRole = async (uid: string | undefined) => {
-    if (!uid) { setIsAdmin(false); return; }
-    const { data } = await supabase.from("user_roles").select("role").eq("user_id", uid);
-    setIsAdmin(!!data?.some((r) => r.role === "admin"));
-  };
+  const { data: user, isLoading } = useQuery({
+    queryKey: ['auth-state'],
+    queryFn: () => getAuthState(),
+    staleTime: 60_000,
+    retry: false,
+  })
 
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      setTimeout(() => loadRole(newSession?.user?.id), 0);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      loadRole(data.session?.user?.id).finally(() => setLoading(false));
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  const signOut = async () => { await supabase.auth.signOut(); };
-  const refreshRole = async () => { await loadRole(user?.id); };
+  const signOut = async () => {
+    await signOutFn()
+    qc.setQueryData(['auth-state'], null)
+    qc.invalidateQueries()
+  }
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signOut, refreshRole }}>
+    <AuthContext.Provider
+      value={{
+        user: user ?? null,
+        isLoading,
+        isAdmin: user?.isAdmin ?? false,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
-  );
+  )
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  return useContext(AuthContext)
 }
