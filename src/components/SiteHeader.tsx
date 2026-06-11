@@ -27,9 +27,9 @@ export function SiteHeader() {
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 group shrink-0">
           <img
-            src="/logo.jpeg"
+            src="/favicon.svg"
             alt="VIBELEARN"
-            className="h-8 w-8 sm:h-10 sm:w-10 object-contain transition-transform group-hover:scale-105 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]"
+            className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover transition-transform group-hover:scale-105 ring-2 ring-primary/30 drop-shadow-[0_0_8px_rgba(45,212,168,0.5)]"
           />
           <span className="font-display text-base sm:text-lg font-bold tracking-widest uppercase">
             VIBE<span className="text-primary">LEARN</span>
@@ -101,7 +101,7 @@ export function SiteHeader() {
             <SheetContent side="right" className="bg-background border-border w-72">
               {/* Sheet header */}
               <div className="flex items-center gap-2 pb-6 border-b border-border">
-                <img src="/logo.jpeg" alt="VIBELEARN" className="h-8 w-8 object-contain" />
+                <img src="/favicon.svg" alt="VIBELEARN" className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/30" />
                 <span className="font-display text-base font-bold tracking-widest uppercase">
                   VIBE<span className="text-primary">LEARN</span>
                 </span>

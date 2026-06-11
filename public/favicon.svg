@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="geometricPrecision">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#122d3d"/>
+      <stop offset="100%" stop-color="#090f18"/>
+    </radialGradient>
+    <linearGradient id="vg" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4a8"/>
+      <stop offset="100%" stop-color="#73ffb8"/>
+    </linearGradient>
+    <linearGradient id="ring-g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4a8" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#73ffb8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#2dd4a8" stop-opacity="0.5"/>
+    </linearGradient>
+    <radialGradient id="inner-light" cx="50%" cy="55%" r="45%">
+      <stop offset="0%" stop-color="#2dd4a8" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#2dd4a8" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="clip"><circle cx="256" cy="256" r="252"/></clipPath>
+  </defs>
+
+  <!-- Base circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+
+  <!-- Inner ambient light -->
+  <circle cx="256" cy="256" r="256" fill="url(#inner-light)"/>
+
+  <!-- Outer glowing rings -->
+  <circle cx="256" cy="256" r="248" fill="none" stroke="url(#ring-g)" stroke-width="2" opacity="0.35"/>
+  <circle cx="256" cy="256" r="237" fill="none" stroke="url(#ring-g)" stroke-width="3.5" opacity="0.55"/>
+
+  <!-- V shape with glow -->
+  <g clip-path="url(#clip)">
+    <!-- Glow layer -->
+    <line x1="106" y1="116" x2="256" y2="364" stroke="#2dd4a8" stroke-width="72" stroke-linecap="round" opacity="0.25"/>
+    <line x1="256" y1="364" x2="406" y2="116" stroke="#2dd4a8" stroke-width="72" stroke-linecap="round" opacity="0.25"/>
+    <!-- Main V -->
+    <line x1="106" y1="116" x2="256" y2="364" stroke="url(#vg)" stroke-width="52" stroke-linecap="round" filter="url(#glow)"/>
+    <line x1="256" y1="364" x2="406" y2="116" stroke="url(#vg)" stroke-width="52" stroke-linecap="round" filter="url(#glow)"/>
+  </g>
+
+  <!-- Bottom apex glow dot -->
+  <circle cx="256" cy="364" r="30" fill="#2dd4a8" opacity="0.15" filter="url(#soft-glow)"/>
+  <circle cx="256" cy="364" r="11" fill="#73ffb8" opacity="0.85" filter="url(#soft-glow)"/>
+
+  <!-- Top-right 4-point sparkle star -->
+  <g transform="translate(388,148)" filter="url(#soft-glow)">
+    <path d="M0,-14 L3,-3 L14,0 L3,3 L0,14 L-3,3 L-14,0 L-3,-3 Z" fill="#73ffb8" opacity="0.95"/>
+  </g>
+  <!-- Small orbiting dots -->
+  <circle cx="422" cy="120" r="5.5" fill="#73ffb8" opacity="0.75"/>
+  <circle cx="405" cy="106" r="3.5" fill="#2dd4a8" opacity="0.55"/>
+
+  <!-- Top-left mini sparkle -->
+  <g transform="translate(122,150)" opacity="0.7">
+    <path d="M0,-9 L2,-2 L9,0 L2,2 L0,9 L-2,2 L-9,0 L-2,-2 Z" fill="#2dd4a8"/>
+  </g>
+
+  <!-- Bottom highlight bar (subtle) -->
+  <rect x="96" y="430" width="320" height="3" rx="2" fill="url(#vg)" opacity="0.2"/>
+</svg>

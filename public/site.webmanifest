@@ -1,0 +1,27 @@
+{
+  "name": "VIBELEARN — Learn Coding with AI",
+  "short_name": "VIBELEARN",
+  "description": "A modern tech learning platform. Build real apps with AI as your co-pilot. React, TypeScript, AI/ML, DevOps and more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1520",
+  "theme_color": "#2dd4a8",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["education", "productivity", "utilities"],
+  "screenshots": [
+    {
+      "src": "/photo.png",
+      "type": "image/png",
+      "sizes": "1280x800",
+      "form_factor": "wide"
+    }
+  ]
+}

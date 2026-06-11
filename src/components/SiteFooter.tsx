@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div className="grid gap-8 sm:grid-cols-2 md:grid-cols-4">
           <div className="sm:col-span-2">
             <Link to="/" className="flex items-center gap-2 group w-fit">
-              <img src="/logo.jpeg" alt="VIBELEARN" className="h-8 w-8 object-contain" />
+              <img src="/favicon.svg" alt="VIBELEARN" className="h-8 w-8 rounded-full object-cover ring-2 ring-primary/30" />
               <span className="font-display text-base font-bold tracking-widest uppercase">
                 VIBE<span className="text-primary">LEARN</span>
               </span>

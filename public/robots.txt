@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+# Block admin panel from indexing
+Disallow: /admin
+
+# Block auth pages
+Disallow: /auth
+
+# Block user dashboard
+Disallow: /dashboard
+
+# Sitemap
+Sitemap: https://vibelearn.app/sitemap.xml

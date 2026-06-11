@@ -10,7 +10,17 @@ import {
   Award, ArrowRight, BookOpen, Zap, CheckCircle2,
 } from 'lucide-react'
 
-export const Route = createFileRoute('/tracks')({ component: TracksPage })
+export const Route = createFileRoute('/tracks')({
+  component: TracksPage,
+  head: () => ({
+    meta: [
+      { title: "Coding Learning Tracks | Frontend, Backend, AI & ML — VIBELEARN" },
+      { name: "description", content: "Choose your learning track on VIBELEARN. Structured paths from beginner to certified in Frontend Development, Vibecoding, Backend APIs, AI & Machine Learning, DevOps, and UI Design." },
+      { property: "og:title", content: "Coding Learning Tracks | VIBELEARN" },
+      { property: "og:description", content: "Pick your coding track — Vibecoding, Frontend, Backend, AI/ML, DevOps or Design. Complete lessons, pass exams, earn certificates." },
+    ],
+  }),
+})
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles, Layout, Server, Brain, Cloud, Palette,

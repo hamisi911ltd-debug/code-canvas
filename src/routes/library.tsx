@@ -7,7 +7,17 @@ import { Badge } from '@/components/ui/badge'
 import { Search, Play, FileText, Link2, ArrowRight, Sparkles, Layout, Server, Brain, Cloud, Palette, Library } from 'lucide-react'
 import { useState } from 'react'
 
-export const Route = createFileRoute('/library')({ component: LibraryPage })
+export const Route = createFileRoute('/library')({
+  component: LibraryPage,
+  head: () => ({
+    meta: [
+      { title: "Tech Course Library | Web Dev, AI & Coding Modules — VIBELEARN" },
+      { name: "description", content: "Explore VIBELEARN's full course library. Modules covering React, TypeScript, AI coding, backend development, DevOps and design. Videos, notes, quizzes and a final exam per module." },
+      { property: "og:title", content: "Tech Course Library | VIBELEARN" },
+      { property: "og:description", content: "Explore our full library of tech modules — React, AI coding, DevOps, design and more. Each module includes videos, notes, tests and a certificate exam." },
+    ],
+  }),
+})
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles, Layout, Server, Brain, Cloud, Palette,

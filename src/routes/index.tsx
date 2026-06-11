@@ -8,7 +8,18 @@ import {
   CheckCircle2, Star,
 } from "lucide-react";
 
-export const Route = createFileRoute("/")({ component: Index });
+export const Route = createFileRoute("/")({
+  component: Index,
+  head: () => ({
+    meta: [
+      { title: "VIBELEARN — Learn Coding with AI | Build Real Apps with React & TypeScript" },
+      { name: "description", content: "Start learning to code with AI today. VIBELEARN offers hands-on courses in React, TypeScript, AI-assisted coding (vibecoding), full-stack development, DevOps, and UI design. Free to start. Earn certificates." },
+      { property: "og:title", content: "VIBELEARN — Learn Coding with AI | Build Real Apps" },
+      { property: "og:description", content: "Hands-on coding courses for the vibe era. Build real apps with AI, learn React, TypeScript, and full-stack development. Free to start." },
+      { property: "og:url", content: "https://vibelearn.app/" },
+    ],
+  }),
+});
 
 const iconMap: Record<string, any> = { Sparkles, Layout, Server, Brain, Cloud, Palette, Code2 };
 
@@ -50,7 +61,7 @@ function Index() {
         <div className="absolute inset-0 grid-pattern opacity-40" />
         <div
           className="absolute inset-0 bg-center bg-no-repeat bg-contain opacity-[0.13] pointer-events-none"
-          style={{ backgroundImage: "url('/logo.jpeg')" }}
+          style={{ backgroundImage: "url('/favicon.svg')" }}
         />
         <div className="relative mx-auto w-full max-w-7xl px-5 sm:px-6 pt-16 pb-20 sm:pt-24 sm:pb-32 text-center">
           <Badge className="mb-5 bg-primary/10 text-primary border border-primary/30 hover:bg-primary/15 text-xs sm:text-sm">

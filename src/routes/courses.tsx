@@ -12,6 +12,14 @@ const search = z.object({ category: z.string().optional() })
 export const Route = createFileRoute('/courses')({
   component: CoursesPage,
   validateSearch: (s) => search.parse(s),
+  head: () => ({
+    meta: [
+      { title: "Online Coding Courses | React, TypeScript, AI Development — VIBELEARN" },
+      { name: "description", content: "Browse all VIBELEARN coding courses. Learn React, TypeScript, full-stack web development, AI-assisted coding, DevOps, and UI design. Beginner to advanced. Earn certificates on completion." },
+      { property: "og:title", content: "Online Coding Courses | VIBELEARN" },
+      { property: "og:description", content: "Browse hands-on courses in React, TypeScript, AI/ML, DevOps, and more. Learn by building real apps." },
+    ],
+  }),
 })
 
 function CoursesPage() {
