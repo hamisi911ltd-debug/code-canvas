@@ -15,7 +15,6 @@ import {
   Coins, ShieldCheck, Smartphone,
 } from 'lucide-react'
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/library/$moduleSlug')({ component: ModulePage })
