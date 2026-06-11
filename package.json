@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "deploy": "vite build && wrangler deploy",
-    "deploy:preview": "vite build && wrangler deploy --env preview"
+    "deploy": "vite build && wrangler deploy dist/server/server.js --no-bundle --compatibility-date 2025-09-24 --compatibility-flags nodejs_compat",
+    "deploy:preview": "vite build && wrangler deploy dist/server/server.js --no-bundle --compatibility-date 2025-09-24 --compatibility-flags nodejs_compat --env preview"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
