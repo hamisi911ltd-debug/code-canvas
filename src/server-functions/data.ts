@@ -339,13 +339,47 @@ export const getModuleDetail = createServerFn({ method: 'GET', strict: false })
       quiz: parseJSON(l.quiz as string, null),
     })
 
+    const quizLessons = (qRes.results ?? []).map(mapLesson)
+
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+    let quizResults: Record<string, { score: number; passed: boolean }> = {}
+    let certification: Record<string, unknown> | null = null
+
+    if (sessionUser && quizLessons.length) {
+      const lessonIds = quizLessons.map((l) => l.id as string)
+      const phq = lessonIds.map(() => '?').join(',')
+      const [qrRes, certRes] = await Promise.all([
+        db
+          .prepare(`SELECT lesson_id, score, passed FROM quiz_results WHERE user_id = ? AND lesson_id IN (${phq})`)
+          .bind(sessionUser.id, ...lessonIds)
+          .all<{ lesson_id: string; score: number; passed: number }>(),
+        db
+          .prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?')
+          .bind(sessionUser.id, category.id)
+          .first<Record<string, unknown>>(),
+      ])
+      quizResults = Object.fromEntries(
+        (qrRes.results ?? []).map((r) => [r.lesson_id, { score: r.score, passed: !!r.passed }]),
+      )
+      certification = certRes ?? null
+    } else if (sessionUser) {
+      certification =
+        (await db
+          .prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?')
+          .bind(sessionUser.id, category.id)
+          .first<Record<string, unknown>>()) ?? null
+    }
+
     return {
       category,
       videoLessons: (vRes.results ?? []).map(mapLesson),
       noteLessons: (nRes.results ?? []).map(mapLesson),
       resources: (rRes.results ?? []).map((r) => ({ ...r, courses: { title: r.course_title, slug: r.course_slug } })),
-      quizLessons: (qRes.results ?? []).map(mapLesson),
+      quizLessons,
       exam: exam ? { ...exam, questions: parseJSON(exam.questions as string, []) } : null,
+      quizResults,
+      certification: certification ?? null,
     }
   })
 

@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  getModuleDetail, getTokenBalance, purchaseModuleAccess,
+  getModuleDetail, getTokenBalance, purchaseModuleAccess, submitQuiz, submitExam,
 } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
   Coins, ShieldCheck, Smartphone,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/library/$moduleSlug')({ component: ModulePage })
@@ -153,13 +154,39 @@ function CertificateBanner({ score, issuedAt, examTitle }: { score: number; issu
 }
 
 // ── Quiz (per-lesson) ─────────────────────────────────────────────────────
-function LessonQuiz({ lesson, userId }: { lesson: any; userId: string | undefined }) {
+function LessonQuiz({
+  lesson,
+  userId,
+  priorResult,
+}: {
+  lesson: any
+  userId: string | undefined
+  priorResult: { score: number; passed: boolean } | null
+}) {
+  const qc = useQueryClient()
   const questions: QuizQuestion[] = lesson.quiz?.questions ?? []
   const [answers, setAnswers] = useState<(number | null)[]>(Array(questions.length).fill(null))
   const [submitted, setSubmitted] = useState(false)
+  const [result, setResult] = useState<{ score: number; passed: boolean } | null>(priorResult ?? null)
   const [open, setOpen] = useState(false)
 
-  const alreadyPassed = false // simplified — no per-quiz persistence query needed in module view
+  const saveMutation = useMutation({
+    mutationFn: (d: { score: number; passed: boolean }) =>
+      submitQuiz({ data: { lessonId: lesson.id, score: d.score, passed: d.passed } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['module-detail'] }),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to save result'),
+  })
+
+  const handleSubmit = () => {
+    const correct = answers.filter((a, i) => a === questions[i].answer).length
+    const score = questions.length ? Math.round((correct / questions.length) * 100) : 0
+    const passed = score >= 70
+    setResult({ score, passed })
+    setSubmitted(true)
+    saveMutation.mutate({ score, passed })
+    if (passed) toast.success(`Quiz passed! ${score}%`)
+    else toast.error(`${score}% — need 70% to pass. Try again!`)
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -171,7 +198,11 @@ function LessonQuiz({ lesson, userId }: { lesson: any; userId: string | undefine
             <div className="text-xs text-muted-foreground">{questions.length} question{questions.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
-        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        <div className="flex items-center gap-2">
+          {result?.passed && <Badge className="bg-primary/15 text-primary border-0 text-xs">Passed {result.score}%</Badge>}
+          {result && !result.passed && <Badge variant="destructive" className="text-xs">Failed {result.score}%</Badge>}
+          {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </div>
       </button>
 
       {open && (
@@ -193,7 +224,7 @@ function LessonQuiz({ lesson, userId }: { lesson: any; userId: string | undefine
                     }
                     return (
                       <label key={oi} className={cls}>
-                        <input type="radio" name={`q${qi}`} className="hidden" disabled={submitted} onChange={() => setAnswers((prev) => { const n = [...prev]; n[qi] = oi; return n })} />
+                        <input type="radio" name={`lq-${lesson.id}-${qi}`} className="hidden" disabled={submitted} onChange={() => setAnswers((prev) => { const n = [...prev]; n[qi] = oi; return n })} />
                         <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-current text-xs">{String.fromCharCode(65 + oi)}</span>
                         {opt}
                         {submitted && isCorrect && <CheckCircle2 className="ml-auto h-4 w-4" />}
@@ -206,19 +237,23 @@ function LessonQuiz({ lesson, userId }: { lesson: any; userId: string | undefine
             )
           })}
 
-          {!submitted ? (
-            <Button
-              onClick={() => setSubmitted(true)}
-              disabled={answers.some((a) => a === null) || !userId}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {!userId ? 'Sign in to submit' : answers.some((a) => a === null) ? 'Answer all questions' : 'Submit quiz'}
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={() => { setAnswers(Array(questions.length).fill(null)); setSubmitted(false) }}>
-              Retry quiz
-            </Button>
-          )}
+          <div className="flex gap-3">
+            {!submitted ? (
+              <Button
+                onClick={handleSubmit}
+                disabled={answers.some((a) => a === null) || !userId || saveMutation.isPending}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {!userId ? 'Sign in to submit' : answers.some((a) => a === null) ? 'Answer all questions' : 'Submit quiz'}
+              </Button>
+            ) : (
+              !result?.passed && (
+                <Button variant="outline" onClick={() => { setAnswers(Array(questions.length).fill(null)); setSubmitted(false); setResult(null) }}>
+                  Retry quiz
+                </Button>
+              )
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -226,16 +261,24 @@ function LessonQuiz({ lesson, userId }: { lesson: any; userId: string | undefine
 }
 
 // ── Final exam ────────────────────────────────────────────────────────────
-function FinalExam({ exam, onCertified }: { exam: any; onCertified: (score: number) => void }) {
+function FinalExam({ exam, categoryId, onCertified }: { exam: any; categoryId: string; onCertified: (score: number) => void }) {
+  const qc = useQueryClient()
   const questions: QuizQuestion[] = exam.questions ?? []
   const [answers, setAnswers] = useState<(number | null)[]>(Array(questions.length).fill(null))
   const [result, setResult] = useState<{ score: number; passed: boolean } | null>(null)
+
+  const saveMutation = useMutation({
+    mutationFn: (score: number) => submitExam({ data: { categoryId, score } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['module-detail'] }),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to save result'),
+  })
 
   const handleSubmit = () => {
     const correct = answers.filter((a, i) => a === questions[i].answer).length
     const score = Math.round((correct / questions.length) * 100)
     const passed = score >= (exam.pass_score ?? 70)
     setResult({ score, passed })
+    saveMutation.mutate(score)
     if (passed) onCertified(score)
   }
 
@@ -278,12 +321,12 @@ function FinalExam({ exam, onCertified }: { exam: any; onCertified: (score: numb
           ))}
           <Button
             onClick={handleSubmit}
-            disabled={answers.some((a) => a === null)}
+            disabled={answers.some((a) => a === null) || saveMutation.isPending}
             size="lg"
             className="bg-primary text-primary-foreground hover:bg-primary/90 glow-ring"
           >
             <Award className="h-4 w-4 mr-2" />
-            {answers.some((a) => a === null) ? 'Answer all questions first' : 'Submit final exam'}
+            {saveMutation.isPending ? 'Saving…' : answers.some((a) => a === null) ? 'Answer all questions first' : 'Submit final exam'}
           </Button>
         </div>
       )}
@@ -304,10 +347,11 @@ function Empty({ icon: Icon, message }: { icon: React.ComponentType<{ className?
 function ModulePage() {
   const { moduleSlug } = Route.useParams()
   const { user } = useAuth()
-  const qc = useQueryClient()
-  const [certified, setCertified] = useState(false)
-  const [certScore, setCertScore] = useState(0)
+  const [justCertified, setJustCertified] = useState(false)
+  const [justScore, setJustScore] = useState(0)
   const [certTime] = useState(new Date().toISOString())
+
+  const qc = useQueryClient()
 
   const { data: mod, isLoading } = useQuery({
     queryKey: ['module-detail', moduleSlug],
@@ -347,8 +391,11 @@ function ModulePage() {
 
   if (!mod) return null
 
-  const { category, videoLessons, noteLessons, resources, quizLessons, exam } = mod as any
+  const { category, videoLessons, noteLessons, resources, quizLessons, exam, quizResults, certification } = mod as any
   const Icon = iconMap[category.icon ?? 'Sparkles'] ?? Sparkles
+  const hasCert = justCertified || !!certification
+  const certScore = justCertified ? justScore : (certification?.score ?? 0)
+  const certIssuedAt = justCertified ? certTime : (certification?.issued_at ?? certTime)
 
   if (!user) {
     return (
@@ -401,9 +448,10 @@ function ModulePage() {
           </div>
           {category.description && <p className="mt-4 text-muted-foreground max-w-2xl">{category.description}</p>}
 
-          {certified && (
+          {hasCert && (
             <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-              <Award className="h-4 w-4" /> You just earned a certificate for this module!
+              <Award className="h-4 w-4" />
+              {justCertified ? 'You just earned a certificate for this module!' : `Certified — ${certScore}%`}
             </div>
           )}
 
@@ -495,7 +543,14 @@ function ModulePage() {
             {(quizLessons ?? []).length === 0 ? <Empty icon={BookOpen} message="No lesson tests in this module yet." /> : (
               <div className="max-w-2xl space-y-3">
                 <p className="text-sm text-muted-foreground mb-6">Each test checks your understanding of that lesson. Pass at 70% or above.</p>
-                {(quizLessons ?? []).map((l: any) => <LessonQuiz key={l.id} lesson={l} userId={user?.id} />)}
+                {(quizLessons ?? []).map((l: any) => (
+                  <LessonQuiz
+                    key={l.id}
+                    lesson={l}
+                    userId={user?.id}
+                    priorResult={(quizResults ?? {})[l.id] ?? null}
+                  />
+                ))}
               </div>
             )}
           </TabsContent>
@@ -507,12 +562,13 @@ function ModulePage() {
                 <h3 className="mt-4 font-display text-lg font-semibold">No exam yet</h3>
                 <p className="mt-2 text-sm text-muted-foreground">The final exam for this module hasn't been published yet.</p>
               </div>
-            ) : certified ? (
-              <CertificateBanner score={certScore} issuedAt={certTime} examTitle={exam.title} />
+            ) : hasCert ? (
+              <CertificateBanner score={certScore} issuedAt={certIssuedAt} examTitle={exam.title} />
             ) : (
               <FinalExam
                 exam={exam}
-                onCertified={(score) => { setCertified(true); setCertScore(score); toast.success(`Certificate earned! Score: ${score}%`) }}
+                categoryId={category.id as string}
+                onCertified={(score) => { setJustCertified(true); setJustScore(score); toast.success(`Certificate earned! Score: ${score}%`) }}
               />
             )}
           </TabsContent>
