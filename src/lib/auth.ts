@@ -1,6 +1,6 @@
 import { getDB, newId } from '@/db/index'
 
-const ADMIN_EMAIL = 'hamisi.911.ltd@gmail.com'
+const ADMIN_EMAIL = 'gakwelihamisi@gmail.com'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 export interface SessionUser {

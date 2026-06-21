@@ -5,6 +5,10 @@ export type { D1Database }
 
 export interface CfEnv {
   DB: D1Database
+  STRIPE_SECRET_KEY: string
+  STRIPE_WEBHOOK_SECRET: string
+  INTASEND_SECRET_KEY: string
+  INTASEND_PUBLISHABLE_KEY: string
   [key: string]: unknown
 }
 

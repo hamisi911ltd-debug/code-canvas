@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   display_name TEXT,
   avatar_url TEXT,
+  stripe_customer_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -144,6 +145,27 @@ CREATE TABLE IF NOT EXISTS token_transactions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS stripe_payments (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  stripe_session_id TEXT UNIQUE NOT NULL,
+  package_id TEXT REFERENCES token_packages(id),
+  tokens INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','expired')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS mpesa_payments (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invoice_id TEXT UNIQUE NOT NULL,
+  category_id TEXT REFERENCES categories(id),
+  phone_number TEXT NOT NULL,
+  amount_kes REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','complete','failed')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS community_posts (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -158,6 +180,7 @@ CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id, position);
 CREATE INDEX IF NOT EXISTS idx_enrollments_user ON enrollments(user_id);
 CREATE INDEX IF NOT EXISTS idx_progress_user ON lesson_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_token_tx_user ON token_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_mpesa_payments_user ON mpesa_payments(user_id);
 
 -- Seed categories
 INSERT OR IGNORE INTO categories (id, name, slug, description, icon) VALUES

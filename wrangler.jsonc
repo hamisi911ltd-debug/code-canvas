@@ -13,5 +13,11 @@
       "database_name": "vibelearn",
       "database_id": "af74b69a-89a8-4ea5-ab3d-f3edf681f1f9"
     }
-  ]
+  ],
+  "vars": {
+    "STRIPE_SECRET_KEY": "",
+    "STRIPE_WEBHOOK_SECRET": "",
+    "INTASEND_SECRET_KEY": "",
+    "INTASEND_PUBLISHABLE_KEY": ""
+  }
 }

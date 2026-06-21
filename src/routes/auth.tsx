@@ -155,7 +155,7 @@ function AuthPage() {
       <div className="relative w-full max-w-md space-y-6">
         <div className="text-center">
           <Link to="/" className="inline-flex items-center gap-3 mb-4">
-            <img src="/favicon.svg" alt="VIBELEARN" className="h-10 w-10 rounded-full ring-2 ring-primary/30" />
+            <img src="/logo.jpeg" alt="VIBELEARN" className="h-10 w-10 rounded-full ring-2 ring-primary/30" />
             <span className="text-2xl font-black tracking-tight text-primary">VIBELEARN</span>
           </Link>
           <p className="text-muted-foreground text-sm">Your modern tech learning platform</p>

@@ -76,9 +76,10 @@ export const getCourse = createServerFn({ method: 'GET', strict: false })
       .all()
     return {
       ...course,
+      id: String(course.id),
       published: !!course.published,
       categories: course.category_name ? { name: course.category_name, slug: course.category_slug } : null,
-      lessons: lessons ?? [],
+      lessons: (lessons ?? []).map((l: any) => ({ ...l, id: String(l.id) })),
     }
   })
 
@@ -245,16 +246,21 @@ export const markLessonComplete = createServerFn({ method: 'POST' })
 export const getDashboard = createServerFn({ method: 'GET', strict: false }).handler(async () => {
   const user = await requireAuth()
   const db = getDB()
-  const { results } = await db
-    .prepare(
-      `SELECT e.course_id, e.enrolled_at, c.title, c.slug, c.level,
-        (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) as total_lessons,
-        (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON lp.lesson_id = l.id WHERE lp.user_id = ? AND l.course_id = c.id) as completed_lessons
-       FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.user_id = ? ORDER BY e.enrolled_at DESC`,
-    )
-    .bind(user.id, user.id)
-    .all<Record<string, unknown>>()
-  return (results ?? []).map((e) => ({
+  const [enrollRes, tokenRow, certRow] = await Promise.all([
+    db
+      .prepare(
+        `SELECT e.course_id, e.enrolled_at, c.title, c.slug, c.level,
+          (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) as total_lessons,
+          (SELECT COUNT(*) FROM lesson_progress lp JOIN lessons l ON lp.lesson_id = l.id WHERE lp.user_id = ? AND l.course_id = c.id) as completed_lessons
+         FROM enrollments e JOIN courses c ON e.course_id = c.id WHERE e.user_id = ? ORDER BY e.enrolled_at DESC`,
+      )
+      .bind(user.id, user.id)
+      .all<Record<string, unknown>>(),
+    db.prepare('SELECT COALESCE(SUM(amount), 0) as balance FROM token_transactions WHERE user_id = ?').bind(user.id).first<{ balance: number }>(),
+    db.prepare('SELECT COUNT(*) as count FROM certifications WHERE user_id = ?').bind(user.id).first<{ count: number }>(),
+  ])
+
+  const courses = (enrollRes.results ?? []).map((e) => ({
     course_id: e.course_id,
     enrolled_at: e.enrolled_at,
     courses: { title: e.title, slug: e.slug, level: e.level },
@@ -262,6 +268,12 @@ export const getDashboard = createServerFn({ method: 'GET', strict: false }).han
     completed: Number(e.completed_lessons),
     pct: e.total_lessons ? Math.round((Number(e.completed_lessons) / Number(e.total_lessons)) * 100) : 0,
   }))
+
+  return {
+    courses,
+    tokenBalance: tokenRow?.balance ?? 0,
+    certificates: certRow?.count ?? 0,
+  }
 })
 
 // ── LIBRARY ──────────────────────────────────────────────────────────────────
@@ -395,16 +407,6 @@ export const getTokenBalance = createServerFn({ method: 'GET', strict: false }).
   return row?.balance ?? 0
 })
 
-export const purchaseModuleAccess = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) => d as { mpesaCode: string })
-  .handler(async ({ data }) => {
-    const user = await requireAuth()
-    const db = getDB()
-    await db
-      .prepare('INSERT INTO token_transactions (id, user_id, amount, type, description) VALUES (?, ?, ?, ?, ?)')
-      .bind(newId(), user.id, 1, 'purchase', `Module access — KES 50 · M-Pesa ${data.mpesaCode}`)
-      .run()
-  })
 
 export const getTokenPackages = createServerFn({ method: 'GET', strict: false }).handler(async () => {
   const db = getDB()

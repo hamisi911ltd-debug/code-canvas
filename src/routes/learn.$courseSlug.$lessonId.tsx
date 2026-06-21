@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { getCourse, getLessonProgress, markLessonComplete } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/learn/$courseSlug/$lessonId')({ component: LessonView })
@@ -17,6 +17,52 @@ function getEmbedUrl(url: string | null | undefined): string | null {
   const vm = url.match(/vimeo\.com\/(\d+)/)
   if (vm) return `https://player.vimeo.com/video/${vm[1]}`
   return url
+}
+
+function NoteRenderer({ content }: { content: string }) {
+  const lines = content.split('\n')
+  const rendered: ReactNode[] = []
+  let listBuffer: string[] = []
+  let listKey = 0
+
+  const flushList = () => {
+    if (listBuffer.length) {
+      const items = [...listBuffer]
+      rendered.push(
+        <ul key={`ul-${listKey++}`} className="list-disc list-inside space-y-1 my-2 text-sm text-foreground/90">
+          {items.map((item, i) => <li key={i}>{inlineFormat(item)}</li>)}
+        </ul>
+      )
+      listBuffer = []
+    }
+  }
+
+  const inlineFormat = (text: string): ReactNode => {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g)
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) return <strong key={i}>{part.slice(2, -2)}</strong>
+      if (part.startsWith('`') && part.endsWith('`')) return <code key={i} className="bg-muted px-1.5 py-0.5 rounded text-primary text-xs font-mono">{part.slice(1, -1)}</code>
+      if (part.startsWith('*') && part.endsWith('*')) return <em key={i}>{part.slice(1, -1)}</em>
+      return part
+    })
+  }
+
+  lines.forEach((line, i) => {
+    if (line.startsWith('### ')) { flushList(); rendered.push(<h3 key={i} className="text-base font-bold mt-5 mb-1.5 text-foreground">{line.slice(4)}</h3>) }
+    else if (line.startsWith('## ')) { flushList(); rendered.push(<h2 key={i} className="text-lg font-bold mt-6 mb-2 text-foreground border-b border-border pb-1">{line.slice(3)}</h2>) }
+    else if (line.startsWith('# ')) { flushList(); rendered.push(<h1 key={i} className="text-xl font-bold mt-6 mb-2 text-foreground">{line.slice(2)}</h1>) }
+    else if (line.startsWith('- ') || line.startsWith('* ')) { listBuffer.push(line.slice(2)) }
+    else if (line.startsWith('> ')) { flushList(); rendered.push(<blockquote key={i} className="border-l-4 border-primary/50 pl-4 my-2 text-sm text-muted-foreground italic">{inlineFormat(line.slice(2))}</blockquote>) }
+    else if (line.trim() === '') { flushList(); rendered.push(<div key={i} className="h-2" />) }
+    else { flushList(); rendered.push(<p key={i} className="text-sm leading-relaxed text-foreground/90 my-1">{inlineFormat(line)}</p>) }
+  })
+  flushList()
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-7">
+      {rendered}
+    </div>
+  )
 }
 
 function LessonView() {
@@ -81,10 +127,12 @@ function LessonView() {
           )}
 
           {current.content && (
-            <div className="mt-8 prose prose-invert max-w-none">
-              <div className="rounded-2xl border border-border bg-card p-6 whitespace-pre-wrap text-sm leading-relaxed">
-                {current.content}
+            <div className="mt-8">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Lesson Notes</span>
               </div>
+              <NoteRenderer content={current.content} />
             </div>
           )}
 

@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import {
-  getModuleDetail, getTokenBalance, purchaseModuleAccess, submitQuiz, submitExam,
+  getModuleDetail, getTokenBalance, submitQuiz, submitExam,
 } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,9 @@ import {
   Sparkles, Layout, Server, Brain, Cloud, Palette,
   Coins, ShieldCheck, Smartphone,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { initiateMpesaPayment, checkMpesaPaymentStatus } from '@/server-functions/intasend'
 
 export const Route = createFileRoute('/library/$moduleSlug')({ component: ModulePage })
 
@@ -26,14 +27,39 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 type QuizQuestion = { q: string; options: string[]; answer: number }
 
 // ── Token Paywall ─────────────────────────────────────────────────────────────
-function TokenPaywall({ category, Icon, onPurchase, isPending }: {
+function TokenPaywall({ category, Icon, onUnlocked }: {
   category: any
   Icon: React.ComponentType<{ className?: string }>
-  onPurchase: (code: string) => void
-  isPending: boolean
+  onUnlocked: () => void
 }) {
-  const [step, setStep] = useState<'info' | 'pay' | 'confirm'>('info')
-  const [mpesaCode, setMpesaCode] = useState('')
+  const [step, setStep] = useState<'info' | 'pay' | 'waiting' | 'failed'>('info')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [invoiceId, setInvoiceId] = useState<string | null>(null)
+
+  const initiate = useMutation({
+    mutationFn: () => initiateMpesaPayment({ data: { phoneNumber, categoryId: category.id } }),
+    onSuccess: (res) => {
+      setInvoiceId(res.invoiceId)
+      setStep('waiting')
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to start M-Pesa payment'),
+  })
+
+  const { data: statusData } = useQuery({
+    queryKey: ['mpesa-status', invoiceId],
+    queryFn: () => checkMpesaPaymentStatus({ data: { invoiceId: invoiceId! } }),
+    enabled: !!invoiceId && step === 'waiting',
+    refetchInterval: (q) => (q.state.data?.status === 'pending' || !q.state.data ? 3000 : false),
+  })
+
+  useEffect(() => {
+    if (statusData?.status === 'complete') {
+      toast.success('Payment confirmed! Welcome to the module.')
+      onUnlocked()
+    } else if (statusData?.status === 'failed') {
+      setStep('failed')
+    }
+  }, [statusData?.status])
 
   return (
     <PageShell>
@@ -78,52 +104,49 @@ function TokenPaywall({ category, Icon, onPurchase, isPending }: {
                   <Smartphone className="h-8 w-8" />
                 </div>
                 <h3 className="font-display text-xl font-bold">Pay via M-Pesa</h3>
-                <div className="mt-5 rounded-xl border border-border bg-muted/30 p-5 text-left space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Paybill / Till</span>
-                    <span className="font-bold text-primary font-mono">522522</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Account</span>
-                    <span className="font-bold font-mono">VIBELEARN</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount</span>
-                    <span className="font-bold">KES 50</span>
-                  </div>
-                </div>
-                <p className="mt-4 text-xs text-muted-foreground">Send KES 50 to the details above, then click Continue.</p>
+                <p className="mt-3 text-sm text-muted-foreground">Enter your Safaricom number — we'll send a payment prompt straight to your phone.</p>
+                <input
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="e.g. 0712345678"
+                  inputMode="tel"
+                  className="mt-4 w-full rounded-xl border border-border bg-background px-4 py-3 text-center font-mono text-lg outline-none focus:border-primary transition"
+                />
                 <div className="mt-5 flex gap-3">
                   <Button variant="outline" onClick={() => setStep('info')} className="flex-1">Back</Button>
-                  <Button onClick={() => setStep('confirm')} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">I've paid →</Button>
+                  <Button
+                    onClick={() => initiate.mutate()}
+                    disabled={initiate.isPending || phoneNumber.trim().length < 9}
+                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {initiate.isPending ? 'Sending…' : 'Send payment prompt'}
+                  </Button>
                 </div>
               </>
             )}
 
-            {step === 'confirm' && (
+            {step === 'waiting' && (
               <>
-                <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary mb-5">
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary mb-5 animate-pulse">
                   <ShieldCheck className="h-8 w-8" />
                 </div>
-                <h3 className="font-display text-xl font-bold">Enter M-Pesa code</h3>
-                <p className="mt-3 text-sm text-muted-foreground">Paste the M-Pesa confirmation code from your SMS.</p>
-                <input
-                  value={mpesaCode}
-                  onChange={(e) => setMpesaCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. QHX7Y2ABCD"
-                  className="mt-4 w-full rounded-xl border border-border bg-background px-4 py-3 text-center font-mono text-lg tracking-widest outline-none focus:border-primary transition"
-                />
-                <div className="mt-5 flex gap-3">
-                  <Button variant="outline" onClick={() => setStep('pay')} className="flex-1">Back</Button>
-                  <Button
-                    onClick={() => onPurchase(mpesaCode)}
-                    disabled={isPending || mpesaCode.length < 6}
-                    className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    {isPending ? 'Activating…' : 'Confirm & unlock'}
-                  </Button>
+                <h3 className="font-display text-xl font-bold">Check your phone</h3>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Enter your M-Pesa PIN on the prompt sent to <span className="font-mono">{phoneNumber}</span> to complete the KES 50 payment.
+                </p>
+                <p className="mt-4 text-xs text-muted-foreground">Waiting for confirmation… this updates automatically.</p>
+                <Button variant="outline" onClick={() => setStep('pay')} className="mt-5 w-full">Use a different number</Button>
+              </>
+            )}
+
+            {step === 'failed' && (
+              <>
+                <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-destructive/15 text-destructive mb-5">
+                  <XCircle className="h-8 w-8" />
                 </div>
-                <p className="mt-4 text-xs text-muted-foreground">Access is activated immediately. If there's an issue, contact support.</p>
+                <h3 className="font-display text-xl font-bold">Payment didn't go through</h3>
+                <p className="mt-3 text-sm text-muted-foreground">The M-Pesa prompt was cancelled or timed out. You haven't been charged.</p>
+                <Button onClick={() => setStep('pay')} className="mt-5 w-full bg-primary text-primary-foreground hover:bg-primary/90">Try again</Button>
               </>
             )}
           </div>
@@ -367,15 +390,10 @@ function ModulePage() {
     queryFn: () => getTokenBalance(),
   })
 
-  const purchaseAccess = useMutation({
-    mutationFn: (mpesaCode: string) => purchaseModuleAccess({ data: { mpesaCode } }),
-    onSuccess: () => {
-      toast.success('Access granted! Welcome to the module.')
-      refetchBalance()
-      qc.invalidateQueries({ queryKey: ['token-balance'] })
-    },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  })
+  const handleUnlocked = () => {
+    refetchBalance()
+    qc.invalidateQueries({ queryKey: ['token-balance'] })
+  }
 
   if (isLoading) {
     return (
@@ -419,7 +437,7 @@ function ModulePage() {
   }
 
   if (tokenBalance !== undefined && tokenBalance < 1) {
-    return <TokenPaywall category={category} Icon={Icon} onPurchase={(code) => purchaseAccess.mutate(code)} isPending={purchaseAccess.isPending} />
+    return <TokenPaywall category={category} Icon={Icon} onUnlocked={handleUnlocked} />
   }
 
   const tabs = [

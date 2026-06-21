@@ -15,14 +15,21 @@ import { Route as LibraryRouteImport } from './routes/library'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as CommunityRouteImport } from './routes/community'
+import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TracksIndexRouteImport } from './routes/tracks.index'
+import { Route as ResearchIndexRouteImport } from './routes/research.index'
+import { Route as LibraryIndexRouteImport } from './routes/library.index'
+import { Route as CoursesIndexRouteImport } from './routes/courses.index'
 import { Route as TracksTrackSlugRouteImport } from './routes/tracks.$trackSlug'
 import { Route as ResearchSlugRouteImport } from './routes/research.$slug'
 import { Route as LibraryModuleSlugRouteImport } from './routes/library.$moduleSlug'
 import { Route as ExamTrackSlugRouteImport } from './routes/exam.$trackSlug'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
+import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
+import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 import { Route as TracksTrackSlugLessonIdRouteImport } from './routes/tracks.$trackSlug.$lessonId'
 import { Route as LearnCourseSlugLessonIdRouteImport } from './routes/learn.$courseSlug.$lessonId'
 
@@ -56,6 +63,11 @@ const CommunityRoute = CommunityRouteImport.update({
   path: '/community',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutRoute = CheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -70,6 +82,26 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TracksIndexRoute = TracksIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => TracksRoute,
+} as any)
+const ResearchIndexRoute = ResearchIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ResearchRoute,
+} as any)
+const LibraryIndexRoute = LibraryIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LibraryRoute,
+} as any)
+const CoursesIndexRoute = CoursesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CoursesRoute,
 } as any)
 const TracksTrackSlugRoute = TracksTrackSlugRouteImport.update({
   id: '/$trackSlug',
@@ -96,6 +128,16 @@ const CoursesSlugRoute = CoursesSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => CoursesRoute,
 } as any)
+const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => CheckoutRoute,
+} as any)
+const CheckoutCancelRoute = CheckoutCancelRouteImport.update({
+  id: '/cancel',
+  path: '/cancel',
+  getParentRoute: () => CheckoutRoute,
+} as any)
 const TracksTrackSlugLessonIdRoute = TracksTrackSlugLessonIdRouteImport.update({
   id: '/$lessonId',
   path: '/$lessonId',
@@ -111,17 +153,24 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/tracks': typeof TracksRouteWithChildren
+  '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/exam/$trackSlug': typeof ExamTrackSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/courses/': typeof CoursesIndexRoute
+  '/library/': typeof LibraryIndexRoute
+  '/research/': typeof ResearchIndexRoute
+  '/tracks/': typeof TracksIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
 }
@@ -129,17 +178,20 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/community': typeof CommunityRoute
-  '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
-  '/library': typeof LibraryRouteWithChildren
-  '/research': typeof ResearchRouteWithChildren
-  '/tracks': typeof TracksRouteWithChildren
+  '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/exam/$trackSlug': typeof ExamTrackSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/courses': typeof CoursesIndexRoute
+  '/library': typeof LibraryIndexRoute
+  '/research': typeof ResearchIndexRoute
+  '/tracks': typeof TracksIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
 }
@@ -148,17 +200,24 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/checkout': typeof CheckoutRouteWithChildren
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/library': typeof LibraryRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/tracks': typeof TracksRouteWithChildren
+  '/checkout/cancel': typeof CheckoutCancelRoute
+  '/checkout/success': typeof CheckoutSuccessRoute
   '/courses/$slug': typeof CoursesSlugRoute
   '/exam/$trackSlug': typeof ExamTrackSlugRoute
   '/library/$moduleSlug': typeof LibraryModuleSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/tracks/$trackSlug': typeof TracksTrackSlugRouteWithChildren
+  '/courses/': typeof CoursesIndexRoute
+  '/library/': typeof LibraryIndexRoute
+  '/research/': typeof ResearchIndexRoute
+  '/tracks/': typeof TracksIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/tracks/$trackSlug/$lessonId': typeof TracksTrackSlugLessonIdRoute
 }
@@ -168,17 +227,24 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/checkout'
     | '/community'
     | '/courses'
     | '/dashboard'
     | '/library'
     | '/research'
     | '/tracks'
+    | '/checkout/cancel'
+    | '/checkout/success'
     | '/courses/$slug'
     | '/exam/$trackSlug'
     | '/library/$moduleSlug'
     | '/research/$slug'
     | '/tracks/$trackSlug'
+    | '/courses/'
+    | '/library/'
+    | '/research/'
+    | '/tracks/'
     | '/learn/$courseSlug/$lessonId'
     | '/tracks/$trackSlug/$lessonId'
   fileRoutesByTo: FileRoutesByTo
@@ -186,17 +252,20 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/checkout'
     | '/community'
-    | '/courses'
     | '/dashboard'
-    | '/library'
-    | '/research'
-    | '/tracks'
+    | '/checkout/cancel'
+    | '/checkout/success'
     | '/courses/$slug'
     | '/exam/$trackSlug'
     | '/library/$moduleSlug'
     | '/research/$slug'
     | '/tracks/$trackSlug'
+    | '/courses'
+    | '/library'
+    | '/research'
+    | '/tracks'
     | '/learn/$courseSlug/$lessonId'
     | '/tracks/$trackSlug/$lessonId'
   id:
@@ -204,17 +273,24 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/checkout'
     | '/community'
     | '/courses'
     | '/dashboard'
     | '/library'
     | '/research'
     | '/tracks'
+    | '/checkout/cancel'
+    | '/checkout/success'
     | '/courses/$slug'
     | '/exam/$trackSlug'
     | '/library/$moduleSlug'
     | '/research/$slug'
     | '/tracks/$trackSlug'
+    | '/courses/'
+    | '/library/'
+    | '/research/'
+    | '/tracks/'
     | '/learn/$courseSlug/$lessonId'
     | '/tracks/$trackSlug/$lessonId'
   fileRoutesById: FileRoutesById
@@ -223,6 +299,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
+  CheckoutRoute: typeof CheckoutRouteWithChildren
   CommunityRoute: typeof CommunityRoute
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
@@ -277,6 +354,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommunityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout': {
+      id: '/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -297,6 +381,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/tracks/': {
+      id: '/tracks/'
+      path: '/'
+      fullPath: '/tracks/'
+      preLoaderRoute: typeof TracksIndexRouteImport
+      parentRoute: typeof TracksRoute
+    }
+    '/research/': {
+      id: '/research/'
+      path: '/'
+      fullPath: '/research/'
+      preLoaderRoute: typeof ResearchIndexRouteImport
+      parentRoute: typeof ResearchRoute
+    }
+    '/library/': {
+      id: '/library/'
+      path: '/'
+      fullPath: '/library/'
+      preLoaderRoute: typeof LibraryIndexRouteImport
+      parentRoute: typeof LibraryRoute
+    }
+    '/courses/': {
+      id: '/courses/'
+      path: '/'
+      fullPath: '/courses/'
+      preLoaderRoute: typeof CoursesIndexRouteImport
+      parentRoute: typeof CoursesRoute
     }
     '/tracks/$trackSlug': {
       id: '/tracks/$trackSlug'
@@ -333,6 +445,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesSlugRouteImport
       parentRoute: typeof CoursesRoute
     }
+    '/checkout/success': {
+      id: '/checkout/success'
+      path: '/success'
+      fullPath: '/checkout/success'
+      preLoaderRoute: typeof CheckoutSuccessRouteImport
+      parentRoute: typeof CheckoutRoute
+    }
+    '/checkout/cancel': {
+      id: '/checkout/cancel'
+      path: '/cancel'
+      fullPath: '/checkout/cancel'
+      preLoaderRoute: typeof CheckoutCancelRouteImport
+      parentRoute: typeof CheckoutRoute
+    }
     '/tracks/$trackSlug/$lessonId': {
       id: '/tracks/$trackSlug/$lessonId'
       path: '/$lessonId'
@@ -350,12 +476,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface CheckoutRouteChildren {
+  CheckoutCancelRoute: typeof CheckoutCancelRoute
+  CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+}
+
+const CheckoutRouteChildren: CheckoutRouteChildren = {
+  CheckoutCancelRoute: CheckoutCancelRoute,
+  CheckoutSuccessRoute: CheckoutSuccessRoute,
+}
+
+const CheckoutRouteWithChildren = CheckoutRoute._addFileChildren(
+  CheckoutRouteChildren,
+)
+
 interface CoursesRouteChildren {
   CoursesSlugRoute: typeof CoursesSlugRoute
+  CoursesIndexRoute: typeof CoursesIndexRoute
 }
 
 const CoursesRouteChildren: CoursesRouteChildren = {
   CoursesSlugRoute: CoursesSlugRoute,
+  CoursesIndexRoute: CoursesIndexRoute,
 }
 
 const CoursesRouteWithChildren =
@@ -363,10 +505,12 @@ const CoursesRouteWithChildren =
 
 interface LibraryRouteChildren {
   LibraryModuleSlugRoute: typeof LibraryModuleSlugRoute
+  LibraryIndexRoute: typeof LibraryIndexRoute
 }
 
 const LibraryRouteChildren: LibraryRouteChildren = {
   LibraryModuleSlugRoute: LibraryModuleSlugRoute,
+  LibraryIndexRoute: LibraryIndexRoute,
 }
 
 const LibraryRouteWithChildren =
@@ -374,10 +518,12 @@ const LibraryRouteWithChildren =
 
 interface ResearchRouteChildren {
   ResearchSlugRoute: typeof ResearchSlugRoute
+  ResearchIndexRoute: typeof ResearchIndexRoute
 }
 
 const ResearchRouteChildren: ResearchRouteChildren = {
   ResearchSlugRoute: ResearchSlugRoute,
+  ResearchIndexRoute: ResearchIndexRoute,
 }
 
 const ResearchRouteWithChildren = ResearchRoute._addFileChildren(
@@ -398,10 +544,12 @@ const TracksTrackSlugRouteWithChildren = TracksTrackSlugRoute._addFileChildren(
 
 interface TracksRouteChildren {
   TracksTrackSlugRoute: typeof TracksTrackSlugRouteWithChildren
+  TracksIndexRoute: typeof TracksIndexRoute
 }
 
 const TracksRouteChildren: TracksRouteChildren = {
   TracksTrackSlugRoute: TracksTrackSlugRouteWithChildren,
+  TracksIndexRoute: TracksIndexRoute,
 }
 
 const TracksRouteWithChildren =
@@ -411,6 +559,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
+  CheckoutRoute: CheckoutRouteWithChildren,
   CommunityRoute: CommunityRoute,
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,

@@ -15,7 +15,7 @@ const OG_IMAGE = `${SITE_URL}/og-image.svg`;
 const schemaOrg = [
   {
     "@context": "https://schema.org", "@type": "Organization",
-    name: "VIBELEARN", url: SITE_URL, logo: `${SITE_URL}/favicon.svg`,
+    name: "VIBELEARN", url: SITE_URL, logo: `${SITE_URL}/logo.jpeg`,
     description: DEFAULT_DESC,
     contactPoint: { "@type": "ContactPoint", email: "hamisi.911.ltd@gmail.com", contactType: "customer support" },
   },
@@ -119,9 +119,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       // Favicon SVG (modern) + fallbacks
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
-      { rel: "apple-touch-icon", href: "/favicon.svg" },
-      { rel: "shortcut icon", href: "/favicon.svg" },
+      { rel: "icon", type: "image/jpeg", href: "/logo.jpeg" },
+      { rel: "apple-touch-icon", href: "/logo.jpeg" },
+      { rel: "shortcut icon", href: "/logo.jpeg" },
       // Web app manifest
       { rel: "manifest", href: "/site.webmanifest" },
       // Canonical

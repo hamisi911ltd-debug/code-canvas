@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="bg6" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#150d2e"/>
+      <stop offset="100%" stop-color="#1a0a2e"/>
+    </linearGradient>
+    <radialGradient id="glow6a" cx="30%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow6b" cx="70%" cy="60%" r="40%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg6)"/>
+  <ellipse cx="240" cy="180" rx="300" ry="240" fill="url(#glow6a)"/>
+  <ellipse cx="560" cy="300" rx="260" ry="200" fill="url(#glow6b)"/>
+  <!-- design tokens / swatches -->
+  <g transform="translate(460, 50)">
+    <!-- color palette row -->
+    <rect x="0" y="0" width="48" height="48" rx="8" fill="#a855f7"/>
+    <rect x="56" y="0" width="48" height="48" rx="8" fill="#ec4899"/>
+    <rect x="112" y="0" width="48" height="48" rx="8" fill="#f43f5e"/>
+    <rect x="168" y="0" width="48" height="48" rx="8" fill="#8b5cf6"/>
+    <rect x="224" y="0" width="48" height="48" rx="8" fill="#06b6d4"/>
+    <!-- typography specimen -->
+    <rect x="0" y="68" width="272" height="70" rx="8" fill="#1e1040" stroke="#a855f730" stroke-width="1"/>
+    <text x="16" y="92" font-family="system-ui" font-size="11" fill="#a855f7" font-weight="700">Aa — Display Font</text>
+    <text x="16" y="116" font-family="system-ui" font-size="24" fill="white" font-weight="800">Heading Style</text>
+    <!-- component card -->
+    <rect x="0" y="156" width="130" height="90" rx="8" fill="#1e1040" stroke="#ec489930" stroke-width="1"/>
+    <rect x="12" y="168" width="106" height="44" rx="6" fill="#ec489920"/>
+    <rect x="12" y="220" width="60" height="10" rx="5" fill="#94a3b840"/>
+    <rect x="12" y="236" width="90" height="6" rx="3" fill="#94a3b825"/>
+    <!-- button component -->
+    <rect x="0" y="258" width="130" height="40" rx="8" fill="#1e1040" stroke="#a855f730" stroke-width="1"/>
+    <rect x="16" y="268" width="98" height="20" rx="10" fill="#a855f7"/>
+    <text x="65" y="282" font-family="system-ui" font-size="10" fill="white" text-anchor="middle" font-weight="600">Button</text>
+    <!-- spacing / grid -->
+    <rect x="142" y="156" width="130" height="142" rx="8" fill="#1e1040" stroke="#06b6d430" stroke-width="1"/>
+    <line x1="156" y1="170" x2="260" y2="170" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="156" y1="196" x2="260" y2="196" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="156" y1="222" x2="260" y2="222" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="156" y1="248" x2="260" y2="248" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="182" y1="156" x2="182" y2="298" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="208" y1="156" x2="208" y2="298" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="234" y1="156" x2="234" y2="298" stroke="#06b6d450" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="272" y="175" font-family="system-ui" font-size="9" fill="#94a3b8">8px</text>
+  </g>
+  <!-- labels -->
+  <text x="55" y="180" font-family="system-ui, sans-serif" font-weight="700" font-size="12" fill="#a855f7" letter-spacing="3">UI DESIGN</text>
+  <text x="55" y="228" font-family="system-ui, sans-serif" font-weight="800" font-size="38" fill="white">Design Systems</text>
+  <text x="55" y="275" font-family="system-ui, sans-serif" font-weight="800" font-size="38" fill="white">in Figma</text>
+  <text x="55" y="316" font-family="system-ui, sans-serif" font-size="14" fill="#94a3b8">Tokens · Components · Layouts · Handoff</text>
+  <rect x="55" y="340" width="96" height="28" rx="14" fill="#a855f720" stroke="#a855f7" stroke-width="1"/>
+  <text x="103" y="359" font-family="system-ui, sans-serif" font-size="12" fill="#a855f7" text-anchor="middle">Beginner</text>
+</svg>

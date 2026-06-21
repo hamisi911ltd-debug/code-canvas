@@ -67,7 +67,7 @@ function CourseDetail() {
     <PageShell>
       <section className="bg-glow relative">
         <div className="absolute inset-0 grid-pattern opacity-30" />
-        <div className="relative mx-auto max-w-5xl px-4 sm:px-6 pt-16 pb-12">
+        <div className="relative mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10 pb-8">
           <Link to="/courses" className="text-sm text-muted-foreground hover:text-primary">← All courses</Link>
           <div className="mt-4 flex items-center gap-2">
             {(course as any).categories && (
@@ -111,25 +111,33 @@ function CourseDetail() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-12">
-        <h2 className="font-display text-2xl font-bold mb-6">Lessons</h2>
+      <section className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl sm:text-2xl font-bold">Course Content</h2>
+          <span className="text-xs text-muted-foreground">{lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</span>
+        </div>
         {lessons.length === 0 ? (
           <p className="text-muted-foreground">Lessons coming soon.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {lessons.map((l: any, i: number) => {
               const isDone = done.has(l.id)
               const accessible = !!enrollment
               const Inner = (
-                <div className={`group flex items-center gap-4 rounded-xl border bg-card p-4 transition ${accessible ? 'hover:border-primary/50 cursor-pointer' : 'opacity-60'} border-border`}>
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${isDone ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                    {isDone ? <CheckCircle2 className="h-5 w-5" /> : accessible ? <Play className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                <div className={`group flex items-center gap-3 rounded-xl border bg-card p-3 sm:p-4 transition ${accessible ? 'hover:border-primary/50 cursor-pointer' : 'opacity-60'} border-border`}>
+                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${isDone ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                    {isDone ? <CheckCircle2 className="h-4 w-4" /> : accessible ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs text-muted-foreground">Lesson {i + 1}</div>
-                    <div className="font-medium truncate">{l.title}</div>
+                    <div className="text-[10px] text-muted-foreground mb-0.5">Lesson {i + 1}</div>
+                    <div className="font-medium text-sm">{l.title}</div>
+                    {l.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{l.description}</div>}
+                    <div className="flex items-center gap-2 mt-1">
+                      {l.video_url && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">▶ Video</span>}
+                      {l.content && <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full">📄 Notes</span>}
+                      {l.duration_minutes ? <span className="text-[10px] text-muted-foreground">{l.duration_minutes}m</span> : null}
+                    </div>
                   </div>
-                  {l.duration_minutes ? <span className="text-xs text-muted-foreground">{l.duration_minutes} min</span> : null}
                 </div>
               )
               return accessible ? (

@@ -47,7 +47,7 @@ export const signUpFn = createServerFn({ method: 'POST' })
       maxAge: SESSION_MAX_AGE,
     })
 
-    const isAdmin = email.toLowerCase() === 'hamisi.911.ltd@gmail.com'
+    const isAdmin = email.toLowerCase() === 'gakwelihamisi@gmail.com'
     return { id, email: email.toLowerCase(), display_name: displayName || null, isAdmin }
   })
 
@@ -76,7 +76,7 @@ export const signInFn = createServerFn({ method: 'POST' })
       maxAge: SESSION_MAX_AGE,
     })
 
-    const isAdmin = user.email.toLowerCase() === 'hamisi.911.ltd@gmail.com'
+    const isAdmin = user.email.toLowerCase() === 'gakwelihamisi@gmail.com'
     return { id: user.id, email: user.email, display_name: user.display_name, isAdmin }
   })
 
