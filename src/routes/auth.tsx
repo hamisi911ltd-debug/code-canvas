@@ -147,18 +147,18 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="h-[100dvh] overflow-hidden bg-background flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[400px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-md space-y-6">
+      <div className="relative w-full max-w-md space-y-3 sm:space-y-4">
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center gap-3 mb-4">
-            <img src="/logo.jpeg" alt="VIBELEARN" className="h-10 w-10 rounded-full ring-2 ring-primary/30" />
-            <span className="text-2xl font-black tracking-tight text-primary">VIBELEARN</span>
+          <Link to="/" className="inline-flex items-center gap-3 mb-1.5">
+            <img src="/logo.jpeg" alt="VIBELEARN" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full ring-2 ring-primary/30" />
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-primary">VIBELEARN</span>
           </Link>
-          <p className="text-muted-foreground text-sm">Your modern tech learning platform</p>
+          <p className="text-muted-foreground text-xs sm:text-sm">Your modern tech learning platform</p>
         </div>
 
         <Card className="border-border/60 shadow-2xl bg-card/80 backdrop-blur">
@@ -175,7 +175,7 @@ function AuthPage() {
 
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn}>
-                  <CardContent className="space-y-4 pt-6">
+                  <CardContent className="space-y-2.5 sm:space-y-3 pt-4 pb-4">
                     <CardTitle className="text-xl">Welcome back</CardTitle>
                     <CardDescription>Sign in to continue learning</CardDescription>
                     <div className="space-y-2">
@@ -204,7 +204,7 @@ function AuthPage() {
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp}>
-                  <CardContent className="space-y-4 pt-6">
+                  <CardContent className="space-y-2.5 sm:space-y-3 pt-4 pb-4">
                     <CardTitle className="text-xl">Create your account</CardTitle>
                     <CardDescription>Start learning for free today</CardDescription>
                     <div className="space-y-2">

@@ -320,7 +320,7 @@ function ModulesBuilder() {
   // Course state
   const [courseOpen, setCourseOpen] = useState(false)
   const [editingCourse, setEditingCourse] = useState<any>(null)
-  const [courseForm, setCourseForm] = useState({ title: '', description: '', level: 'beginner', category_id: '', thumbnail_url: '', duration_minutes: 0, token_cost: 0, published: false })
+  const [courseForm, setCourseForm] = useState({ title: '', description: '', level: 'beginner', category_id: '', thumbnail_url: '', duration_minutes: 0, token_cost: 1, published: false })
 
   // Lesson state
   const [selectedCourseId, setSelectedCourseId] = useState('')
@@ -389,7 +389,7 @@ function ModulesBuilder() {
   const openNewModule = () => { setEditingModule(null); setModuleForm({ name: '', slug: '', description: '', icon: 'Sparkles' }); setModuleOpen(true) }
   const openEditModule = (m: any) => { setEditingModule(m); setModuleForm({ name: m.name, slug: m.slug, description: m.description ?? '', icon: m.icon || 'Sparkles' }); setModuleOpen(true) }
 
-  const openNewCourse = () => { setEditingCourse(null); setCourseForm({ title: '', description: '', level: 'beginner', category_id: selectedModuleId === UNASSIGNED ? '' : selectedModuleId, thumbnail_url: '', duration_minutes: 0, token_cost: 0, published: false }); setCourseOpen(true) }
+  const openNewCourse = () => { setEditingCourse(null); setCourseForm({ title: '', description: '', level: 'beginner', category_id: selectedModuleId === UNASSIGNED ? '' : selectedModuleId, thumbnail_url: '', duration_minutes: 0, token_cost: 1, published: false }); setCourseOpen(true) }
   const openEditCourse = (c: any) => { setEditingCourse(c); setCourseForm({ title: c.title, description: c.description ?? '', level: c.level, category_id: c.category_id ?? '', thumbnail_url: c.thumbnail_url ?? '', duration_minutes: c.duration_minutes ?? 0, token_cost: c.token_cost ?? 0, published: !!c.published }); setCourseOpen(true) }
   const openNewLesson = () => { setEditingLesson(null); setLessonForm({ title: '', description: '', video_url: '', content: '', position: (lessons?.length ?? 0) + 1, duration_minutes: 0 }); setLessonOpen(true) }
   const openEditLesson = (l: any) => { setEditingLesson(l); setLessonForm({ title: l.title, description: l.description ?? '', video_url: l.video_url ?? '', content: l.content ?? '', position: l.position, duration_minutes: l.duration_minutes ?? 0 }); setLessonOpen(true) }
@@ -679,7 +679,7 @@ function ModulesBuilder() {
                 >
                   <Upload className="h-3 w-3" /> Import file
                 </button>
-                <input ref={fileInputRef} type="file" accept=".txt,.md,.csv,.html" className="hidden" onChange={handleDocImport} />
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleDocImport} />
               </div>
               <Textarea
                 value={lessonForm.content}

@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   display_name TEXT,
   avatar_url TEXT,
-  stripe_customer_id TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -145,22 +144,12 @@ CREATE TABLE IF NOT EXISTS token_transactions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS stripe_payments (
-  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  stripe_session_id TEXT UNIQUE NOT NULL,
-  package_id TEXT REFERENCES token_packages(id),
-  tokens INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','expired')),
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE IF NOT EXISTS mpesa_payments (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   invoice_id TEXT UNIQUE NOT NULL,
-  category_id TEXT REFERENCES categories(id),
   phone_number TEXT NOT NULL,
+  tokens INTEGER NOT NULL DEFAULT 1,
   amount_kes REAL NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','complete','failed')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))

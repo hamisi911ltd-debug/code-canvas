@@ -83,6 +83,51 @@ export const getCourse = createServerFn({ method: 'GET', strict: false })
     }
   })
 
+// Resources, final exam, and certification for a course's module (category) — shown
+// alongside the course's own lessons now that this content no longer lives in a separate Library.
+export const getCourseExtras = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { courseId: string; categoryId: string | null })
+  .handler(async ({ data }) => {
+    const db = getDB()
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+
+    const [resourcesRes, quizResultsRes] = await Promise.all([
+      db.prepare('SELECT * FROM resources WHERE course_id = ? ORDER BY created_at DESC').bind(data.courseId).all<Record<string, unknown>>(),
+      sessionUser
+        ? db
+            .prepare(
+              `SELECT qr.lesson_id, qr.score, qr.passed FROM quiz_results qr
+               JOIN lessons l ON qr.lesson_id = l.id
+               WHERE qr.user_id = ? AND l.course_id = ?`,
+            )
+            .bind(sessionUser.id, data.courseId)
+            .all<{ lesson_id: string; score: number; passed: number }>()
+        : Promise.resolve({ results: [] as { lesson_id: string; score: number; passed: number }[] }),
+    ])
+    const quizResults = Object.fromEntries(
+      (quizResultsRes.results ?? []).map((r) => [r.lesson_id, { score: r.score, passed: !!r.passed }]),
+    )
+
+    if (!data.categoryId) {
+      return { resources: resourcesRes.results ?? [], exam: null, certification: null, quizResults }
+    }
+
+    const [exam, certification] = await Promise.all([
+      db.prepare('SELECT * FROM module_exams WHERE category_id = ?').bind(data.categoryId).first<Record<string, unknown>>(),
+      sessionUser
+        ? db.prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?').bind(sessionUser.id, data.categoryId).first<Record<string, unknown>>()
+        : Promise.resolve(null),
+    ])
+
+    return {
+      resources: resourcesRes.results ?? [],
+      exam: exam ? { ...exam, questions: parseJSON(exam.questions as string, []) } : null,
+      certification: certification ?? null,
+      quizResults,
+    }
+  })
+
 export const getAllCoursesAdmin = createServerFn({ method: 'GET', strict: false }).handler(async () => {
   await requireAdmin()
   const db = getDB()
@@ -214,6 +259,24 @@ export const enroll = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const user = await requireAuth()
     const db = getDB()
+
+    const existing = await db.prepare('SELECT 1 FROM enrollments WHERE user_id = ? AND course_id = ?').bind(user.id, data.courseId).first()
+    if (existing) return
+
+    const course = await db.prepare('SELECT token_cost FROM courses WHERE id = ?').bind(data.courseId).first<{ token_cost: number }>()
+    if (!course) throw new Error('Course not found')
+
+    const cost = course.token_cost ?? 0
+    if (cost > 0) {
+      const row = await db.prepare('SELECT COALESCE(SUM(amount), 0) as balance FROM token_transactions WHERE user_id = ?').bind(user.id).first<{ balance: number }>()
+      const balance = row?.balance ?? 0
+      if (balance < cost) throw new Error(`This course costs ${cost} token${cost === 1 ? '' : 's'} — you have ${balance}. Top up to enroll.`)
+      await db
+        .prepare('INSERT INTO token_transactions (id, user_id, amount, type, description) VALUES (?, ?, ?, ?, ?)')
+        .bind(newId(), user.id, -cost, 'usage', `Enrolled in course ${data.courseId}`)
+        .run()
+    }
+
     await db.prepare('INSERT OR IGNORE INTO enrollments (id, user_id, course_id) VALUES (?, ?, ?)').bind(newId(), user.id, data.courseId).run()
   })
 
@@ -275,125 +338,6 @@ export const getDashboard = createServerFn({ method: 'GET', strict: false }).han
     certificates: certRow?.count ?? 0,
   }
 })
-
-// ── LIBRARY ──────────────────────────────────────────────────────────────────
-
-export const getLibraryModules = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  const db = getDB()
-  const { results: categories } = await db.prepare('SELECT * FROM categories ORDER BY name').all<Record<string, unknown>>()
-  const modules = await Promise.all(
-    (categories ?? []).map(async (cat) => {
-      const [videos, notes, resources] = await Promise.all([
-        db
-          .prepare(
-            `SELECT COUNT(*) as count FROM lessons l JOIN courses c ON l.course_id = c.id WHERE c.category_id = ? AND l.video_url IS NOT NULL`,
-          )
-          .bind(cat.id)
-          .first<{ count: number }>(),
-        db
-          .prepare(
-            `SELECT COUNT(*) as count FROM lessons l JOIN courses c ON l.course_id = c.id WHERE c.category_id = ? AND l.content IS NOT NULL`,
-          )
-          .bind(cat.id)
-          .first<{ count: number }>(),
-        db
-          .prepare(`SELECT COUNT(*) as count FROM resources r JOIN courses c ON r.course_id = c.id WHERE c.category_id = ?`)
-          .bind(cat.id)
-          .first<{ count: number }>(),
-      ])
-      return { ...cat, videoCount: videos?.count ?? 0, notesCount: notes?.count ?? 0, resourceCount: resources?.count ?? 0 }
-    }),
-  )
-  return modules
-})
-
-export const getModuleDetail = createServerFn({ method: 'GET', strict: false })
-  .inputValidator((d: unknown) => d as { slug: string })
-  .handler(async ({ data }) => {
-    const db = getDB()
-    const category = await db.prepare('SELECT * FROM categories WHERE slug = ?').bind(data.slug).first<Record<string, unknown>>()
-    if (!category) return null
-
-    const { results: courses } = await db
-      .prepare('SELECT id FROM courses WHERE category_id = ? AND published = 1')
-      .bind(category.id)
-      .all<{ id: string }>()
-    const courseIds = (courses ?? []).map((c) => c.id)
-
-    if (!courseIds.length) {
-      return { category, videoLessons: [], noteLessons: [], resources: [], quizLessons: [], exam: null }
-    }
-
-    const ph = courseIds.map(() => '?').join(',')
-    const [vRes, nRes, rRes, qRes, exam] = await Promise.all([
-      db
-        .prepare(`SELECT l.*, c.title as course_title, c.slug as course_slug FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.course_id IN (${ph}) AND l.video_url IS NOT NULL ORDER BY l.position`)
-        .bind(...courseIds)
-        .all<Record<string, unknown>>(),
-      db
-        .prepare(`SELECT l.*, c.title as course_title, c.slug as course_slug FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.course_id IN (${ph}) AND l.content IS NOT NULL ORDER BY l.position`)
-        .bind(...courseIds)
-        .all<Record<string, unknown>>(),
-      db
-        .prepare(`SELECT r.*, c.title as course_title, c.slug as course_slug FROM resources r JOIN courses c ON r.course_id = c.id WHERE r.course_id IN (${ph}) ORDER BY r.created_at DESC`)
-        .bind(...courseIds)
-        .all<Record<string, unknown>>(),
-      db
-        .prepare(`SELECT l.*, c.title as course_title, c.slug as course_slug FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.course_id IN (${ph}) AND l.quiz IS NOT NULL ORDER BY l.position`)
-        .bind(...courseIds)
-        .all<Record<string, unknown>>(),
-      db.prepare('SELECT * FROM module_exams WHERE category_id = ?').bind(category.id).first<Record<string, unknown>>(),
-    ])
-
-    const mapLesson = (l: Record<string, unknown>) => ({
-      ...l,
-      courses: { title: l.course_title, slug: l.course_slug },
-      quiz: parseJSON(l.quiz as string, null),
-    })
-
-    const quizLessons = (qRes.results ?? []).map(mapLesson)
-
-    const sid = getCookie('vl_session')
-    const sessionUser = await getSession(sid)
-    let quizResults: Record<string, { score: number; passed: boolean }> = {}
-    let certification: Record<string, unknown> | null = null
-
-    if (sessionUser && quizLessons.length) {
-      const lessonIds = quizLessons.map((l) => l.id as string)
-      const phq = lessonIds.map(() => '?').join(',')
-      const [qrRes, certRes] = await Promise.all([
-        db
-          .prepare(`SELECT lesson_id, score, passed FROM quiz_results WHERE user_id = ? AND lesson_id IN (${phq})`)
-          .bind(sessionUser.id, ...lessonIds)
-          .all<{ lesson_id: string; score: number; passed: number }>(),
-        db
-          .prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?')
-          .bind(sessionUser.id, category.id)
-          .first<Record<string, unknown>>(),
-      ])
-      quizResults = Object.fromEntries(
-        (qrRes.results ?? []).map((r) => [r.lesson_id, { score: r.score, passed: !!r.passed }]),
-      )
-      certification = certRes ?? null
-    } else if (sessionUser) {
-      certification =
-        (await db
-          .prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?')
-          .bind(sessionUser.id, category.id)
-          .first<Record<string, unknown>>()) ?? null
-    }
-
-    return {
-      category,
-      videoLessons: (vRes.results ?? []).map(mapLesson),
-      noteLessons: (nRes.results ?? []).map(mapLesson),
-      resources: (rRes.results ?? []).map((r) => ({ ...r, courses: { title: r.course_title, slug: r.course_slug } })),
-      quizLessons,
-      exam: exam ? { ...exam, questions: parseJSON(exam.questions as string, []) } : null,
-      quizResults,
-      certification: certification ?? null,
-    }
-  })
 
 // ── TOKENS ───────────────────────────────────────────────────────────────────
 
@@ -809,101 +753,4 @@ export const submitExam = createServerFn({ method: 'POST' })
       .prepare('INSERT OR REPLACE INTO certifications (id, user_id, category_id, score) VALUES (?, ?, ?, ?)')
       .bind(newId(), user.id, data.categoryId, data.score)
       .run()
-  })
-
-export const getCertifications = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  const sid = getCookie('vl_session')
-  const sessionUser = await getSession(sid)
-  if (!sessionUser) return [] as Array<{ id: string; category_id: string; score: number; issued_at: string; categories: { name: string; slug: string; icon: string | null } }>
-  const db = getDB()
-  const { results } = await db
-    .prepare(
-      `SELECT cert.*, cat.name as category_name, cat.slug as category_slug, cat.icon as category_icon
-       FROM certifications cert JOIN categories cat ON cert.category_id = cat.id
-       WHERE cert.user_id = ? ORDER BY cert.issued_at DESC`,
-    )
-    .bind(sessionUser.id)
-    .all<Record<string, unknown>>()
-  return (results ?? []).map((c) => ({
-    ...c,
-    categories: { name: c.category_name as string, slug: c.category_slug as string, icon: c.category_icon as string | null },
-  }))
-})
-
-export const getTrackData = createServerFn({ method: 'GET', strict: false })
-  .inputValidator((d: unknown) => d as { trackSlug: string })
-  .handler(async ({ data }) => {
-    const db = getDB()
-    const category = await db.prepare('SELECT * FROM categories WHERE slug = ?').bind(data.trackSlug).first<Record<string, unknown>>()
-    if (!category) return null
-
-    const { results: coursesRaw } = await db
-      .prepare('SELECT * FROM courses WHERE category_id = ? AND published = 1 ORDER BY created_at')
-      .bind(category.id)
-      .all<Record<string, unknown>>()
-
-    const courseIds = (coursesRaw ?? []).map((c) => c.id as string)
-    const lessonsByCourse: Record<string, Record<string, unknown>[]> = {}
-    let allLessonIds: string[] = []
-
-    if (courseIds.length) {
-      const ph = courseIds.map(() => '?').join(',')
-      const { results: lessonsRaw } = await db
-        .prepare(`SELECT * FROM lessons WHERE course_id IN (${ph}) ORDER BY course_id, position`)
-        .bind(...courseIds)
-        .all<Record<string, unknown>>()
-      for (const l of lessonsRaw ?? []) {
-        const cid = l.course_id as string
-        if (!lessonsByCourse[cid]) lessonsByCourse[cid] = []
-        lessonsByCourse[cid].push({ ...l, quiz: parseJSON(l.quiz as string, null) })
-        allLessonIds.push(l.id as string)
-      }
-    }
-
-    const sid = getCookie('vl_session')
-    const sessionUser = await getSession(sid)
-    let completedSet = new Set<string>()
-    let certification: Record<string, unknown> | null = null
-    let quizResultMap: Record<string, { score: number; passed: boolean }> = {}
-
-    if (sessionUser && allLessonIds.length) {
-      const ph2 = allLessonIds.map(() => '?').join(',')
-      const [progRes, qrRes] = await Promise.all([
-        db.prepare(`SELECT lesson_id FROM lesson_progress WHERE user_id = ? AND lesson_id IN (${ph2})`).bind(sessionUser.id, ...allLessonIds).all<{ lesson_id: string }>(),
-        db.prepare(`SELECT lesson_id, score, passed FROM quiz_results WHERE user_id = ? AND lesson_id IN (${ph2})`).bind(sessionUser.id, ...allLessonIds).all<{ lesson_id: string; score: number; passed: number }>(),
-      ])
-      completedSet = new Set((progRes.results ?? []).map((r) => r.lesson_id))
-      quizResultMap = Object.fromEntries(
-        (qrRes.results ?? []).map((r) => [r.lesson_id, { score: r.score, passed: !!r.passed }]),
-      )
-      certification = (await db.prepare('SELECT * FROM certifications WHERE user_id = ? AND category_id = ?').bind(sessionUser.id, category.id).first<Record<string, unknown>>()) ?? null
-    }
-
-    const exam = await db.prepare('SELECT * FROM module_exams WHERE category_id = ?').bind(category.id).first<Record<string, unknown>>()
-
-    const courses = (coursesRaw ?? []).map((c) => {
-      const lessons = lessonsByCourse[c.id as string] ?? []
-      const completed = lessons.filter((l) => completedSet.has(l.id as string)).length
-      return {
-        ...c,
-        published: !!(c.published),
-        lessons,
-        totalLessons: lessons.length,
-        completedLessons: completed,
-        pct: lessons.length ? Math.round((completed / lessons.length) * 100) : 0,
-      }
-    })
-
-    const totalCompleted = allLessonIds.filter((id) => completedSet.has(id)).length
-    return {
-      category,
-      courses,
-      exam: exam ? { ...exam, questions: parseJSON(exam.questions as string, []) } : null,
-      certification: certification ?? null,
-      completedIds: Array.from(completedSet),
-      quizResults: quizResultMap,
-      totalLessons: allLessonIds.length,
-      totalCompleted,
-      overallPct: allLessonIds.length ? Math.round((totalCompleted / allLessonIds.length) * 100) : 0,
-    }
   })

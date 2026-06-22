@@ -1,0 +1,850 @@
+// Source curriculum data — 6 courses mapped onto the 6 existing landing-page categories.
+// Stack decisions baked in (resolving CURRICULUM_INTEGRATION.md §7 "open decisions"
+// against what this platform actually runs on): D1 (not MongoDB) for course 3,
+// Cloudflare Workers/Pages (not Vercel) for course 5.
+
+export const courses = [
+  {
+    id: 'course-vibecoding-101',
+    categoryId: 'cat-vibecoding',
+    slug: 'vibecoding-101',
+    title: 'Vibecoding 101: Build Your First AI App',
+    description: 'Build your first AI app, no experience needed. Learn how code works, then guide an AI model to help you ship something real.',
+    level: 'beginner',
+    lessons: [
+      {
+        title: 'What is vibe coding',
+        description: 'Guiding AI tools with precise prompts.',
+        content: `# What is vibe coding?
+
+Vibe coding means you describe *what* you want in plain English, an AI assistant writes the *how* (the boilerplate, the syntax), and you steer the result toward something that actually works. You're not typing every character — you're directing.
+
+It is not "no code." You still need to:
+- Read what the AI wrote and catch mistakes
+- Know enough to ask better follow-up questions
+- Test what you built before trusting it
+
+**A good vibe-coding loop:**
+1. Describe the smallest useful piece of the feature
+2. Let the AI draft it
+3. Run it, see what breaks
+4. Describe the fix you want
+5. Repeat
+
+By the end of this course you'll run that loop for real, building a small AI-powered app from a blank file to something that runs in your browser.`,
+      },
+      {
+        title: 'JavaScript building blocks',
+        description: 'Variables, data types, functions, scope.',
+        content: `# JavaScript building blocks
+
+Every app — AI-assisted or not — is built from a small set of pieces:
+
+**Variables** hold values:
+\`\`\`js
+let tokens = 50;
+const userName = "Alex";
+\`\`\`
+
+**Data types** you'll use constantly: \`string\`, \`number\`, \`boolean\`, \`object\`, \`array\`. JavaScript figures out the type for you, but it matters — \`"5" + 1\` gives \`"51"\` (text), while \`5 + 1\` gives \`6\` (math).
+
+**Functions** package up logic you want to reuse:
+\`\`\`js
+function greet(name) {
+  return "Hello, " + name;
+}
+\`\`\`
+
+**Scope** is about where a variable is visible. A variable declared inside a function only exists inside that function — it can't leak out and clash with something else.
+
+You don't need to memorize all of this today. You need to recognize it when an AI assistant generates it, so you can tell whether the code it wrote actually does what you asked for.`,
+      },
+      {
+        title: 'Async and Promises',
+        description: 'async/await, fetch, error handling.',
+        content: `# Async and Promises
+
+Some things take time: fetching data from a server, reading a file, calling an AI model. JavaScript doesn't freeze and wait — it keeps running and comes back to the slow thing when it's ready. That's "asynchronous" code.
+
+**The modern way to write it — async/await:**
+\`\`\`js
+async function getJoke() {
+  const response = await fetch("https://api.example.com/joke");
+  const data = await response.json();
+  return data.joke;
+}
+\`\`\`
+
+\`await\` pauses *that function* (not your whole app) until the result comes back.
+
+**Always handle failure.** Networks fail, APIs time out, servers return errors:
+\`\`\`js
+try {
+  const joke = await getJoke();
+} catch (err) {
+  console.error("Could not fetch a joke:", err.message);
+}
+\`\`\`
+
+When you ask an AI to "call this API," it's writing exactly this pattern under the hood. Knowing it helps you spot when the error handling is missing — a very common AI-generated bug.`,
+      },
+      {
+        title: 'Calling an AI API',
+        description: 'Send a prompt to an AI model and handle the response.',
+        content: `# Calling an AI API
+
+Talking to an AI model from your code looks a lot like any other API call — you send a request, you get a response back.
+
+**The shape of a typical request:**
+\`\`\`js
+const res = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": API_KEY,
+  },
+  body: JSON.stringify({
+    model: "claude-sonnet-4-6",
+    max_tokens: 200,
+    messages: [{ role: "user", content: "Say hello in five languages." }],
+  }),
+});
+const data = await res.json();
+\`\`\`
+
+**Three things to get right every time:**
+1. **Never put your API key in client-side code.** Anyone can open dev tools and steal it. Call the AI from a server function, not the browser.
+2. **Handle slow responses.** AI calls can take a few seconds — show a loading state.
+3. **Validate what comes back.** The model's response is text; if you need structured data, parse it carefully and handle the case where it doesn't parse.
+
+This is the core building block every AI feature in this course is built on.`,
+      },
+      {
+        title: 'Prompt engineering basics',
+        description: 'Specific prompts, tech details, structured output.',
+        content: `# Prompt engineering basics
+
+The quality of what an AI gives you back is mostly a function of what you asked for.
+
+**Vague prompt:** "Make a button"
+**Specific prompt:** "Make a React button component with a primary and outline variant, using Tailwind classes, that accepts an onClick handler and a loading state that shows a spinner"
+
+The second one gets you working code on the first try far more often.
+
+**Patterns that consistently help:**
+- State the tech stack explicitly (React, TypeScript, Tailwind — whatever you're using)
+- Give an example of the shape you want back, especially for structured data
+- Ask for one thing at a time rather than "build the whole app"
+- If the first answer is close but wrong, say exactly what's wrong rather than re-asking from scratch
+
+**Asking for structured output:**
+"Return only valid JSON matching this shape: { title: string, steps: string[] }"
+
+Being specific isn't a crutch — it's the actual skill. The best vibe coders are precise communicators first.`,
+      },
+      {
+        title: 'Ship your first app',
+        description: 'Put a small AI app together end to end.',
+        content: `# Ship your first app
+
+Time to put it all together. You're going to build a tiny app that:
+1. Takes a topic from a text input
+2. Sends it to an AI model with a clear prompt
+3. Shows the AI's response on the page
+4. Handles the loading and error states properly
+
+**The checklist before you call it done:**
+- [ ] The API key lives server-side, never in client code
+- [ ] There's a visible loading state while waiting for the AI
+- [ ] A failed request shows a real error message, not a blank screen
+- [ ] You tested it with a deliberately weird input to see what breaks
+
+This is the same shape as every "AI feature" you'll see in real products — a form, a call to a model, a result. Once you've shipped this once, you can recognize and build that pattern anywhere.
+
+**You've now done a full vibe-coding loop on a real (if small) app.** Everything after this course adds more pieces — better UIs, real backends, real deployment — to this same foundation.`,
+      },
+    ],
+  },
+  {
+    id: 'course-react-typescript-mastery',
+    categoryId: 'cat-frontend',
+    slug: 'react-typescript-mastery',
+    title: 'React & TypeScript Mastery',
+    description: 'Build interfaces that feel alive, typed and testable. Components, state, and the patterns real frontend teams use every day.',
+    level: 'intermediate',
+    lessons: [
+      {
+        title: 'TypeScript foundations',
+        description: 'Types, interfaces, generics, utility types, tsconfig.',
+        content: `# TypeScript foundations
+
+TypeScript is JavaScript with a type checker bolted on. It catches a whole category of bugs — "this is undefined," "you passed a string where a number was expected" — before your code ever runs.
+
+**Basic types:**
+\`\`\`ts
+let count: number = 0;
+let name: string = "Alex";
+let isActive: boolean = true;
+\`\`\`
+
+**Interfaces** describe the shape of an object:
+\`\`\`ts
+interface User {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+\`\`\`
+
+**Generics** let a function or type work with whatever type you give it, while still being checked:
+\`\`\`ts
+function firstItem<T>(items: T[]): T | undefined {
+  return items[0];
+}
+\`\`\`
+
+**Utility types** save you from re-writing variations of a type by hand: \`Partial<User>\` (every field optional), \`Pick<User, "id" | "email">\` (just those fields), \`Omit<User, "id">\` (everything except that field).
+
+You don't need to know every utility type today — you need to recognize the shape so you can look the rest up when you need them.`,
+      },
+      {
+        title: 'React components and JSX',
+        description: 'Reusable UI, props, one-way data flow.',
+        content: `# React components and JSX
+
+A React component is a function that returns what should appear on screen, written in JSX (HTML-looking syntax inside JavaScript).
+
+\`\`\`tsx
+function CourseCard({ title, level }: { title: string; level: string }) {
+  return (
+    <div className="card">
+      <h3>{title}</h3>
+      <span>{level}</span>
+    </div>
+  );
+}
+\`\`\`
+
+**Props** are how a parent component passes data down to a child — read-only, one direction. The child never reaches back up and changes a prop directly; if it needs to communicate upward, the parent passes down a *function* as a prop, and the child calls that function.
+
+This "one-way data flow" is what makes React apps predictable: data flows down, events flow up, and you can always trace where a piece of UI got its value from.
+
+**Composing components** — building bigger UI from smaller pieces — is the core React skill. A page is just components, inside components, inside components.`,
+      },
+      {
+        title: 'State and effects',
+        description: 'useState, useEffect, the Virtual DOM.',
+        content: `# State and effects
+
+**State** is data that changes over time and that the UI needs to react to.
+
+\`\`\`tsx
+function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+\`\`\`
+
+Calling \`setCount\` doesn't just update a variable — it tells React "re-render this component with the new value."
+
+**The Virtual DOM** is how React does that efficiently: it builds an in-memory description of what the UI should look like, compares it to the previous version, and only touches the real, slow browser DOM where something actually changed.
+
+**Effects** (\`useEffect\`) run code in response to a component appearing, or a value changing — typically for things outside React's normal render flow: fetching data, subscribing to an event, setting a timer.
+
+\`\`\`tsx
+useEffect(() => {
+  fetchCourses().then(setCourses);
+}, []); // empty array = run once, when the component first appears
+\`\`\`
+
+Getting the dependency array right is the single most common source of React bugs — get comfortable with it early.`,
+      },
+      {
+        title: 'Component testing',
+        description: 'Unit tests and assertions with Jest.',
+        content: `# Component testing
+
+A test is code that checks your code. You write what you expect to happen, run it, and get a clear pass/fail instead of manually clicking through the app every time you change something.
+
+**A basic Jest test:**
+\`\`\`ts
+test("adds 1 + 2 to equal 3", () => {
+  expect(sum(1, 2)).toBe(3);
+});
+\`\`\`
+
+For components, you render them and assert on what shows up:
+\`\`\`tsx
+test("shows the course title", () => {
+  render(<CourseCard title="React Basics" level="beginner" />);
+  expect(screen.getByText("React Basics")).toBeInTheDocument();
+});
+\`\`\`
+
+**What's worth testing:**
+- Logic with real branches (a discount calculation, a validation rule)
+- Anything that broke once before — write a test so it can't silently break again
+- Components where the *behavior* matters (clicking submits a form), not just the markup
+
+You don't need 100% coverage. A handful of well-chosen tests around your riskiest logic beats hundreds of tests that just restate what the code already says.`,
+      },
+      {
+        title: 'Advanced: mobile with React Native',
+        description: 'View/Text, Flexbox, Expo, device features.',
+        content: `# Advanced: mobile with React Native
+
+React Native lets you write components in the same component-and-props style as web React, but they render as real native mobile views instead of HTML.
+
+**The building blocks map over, with different names:**
+- \`<div>\` becomes \`<View>\`
+- \`<p>\` / text becomes \`<Text>\` (text must always be inside a \`<Text>\`, unlike the web)
+- Styling uses Flexbox by default — there's no CSS file, you style with a JS object
+
+\`\`\`tsx
+<View style={{ flexDirection: "row", gap: 8 }}>
+  <Text>Tokens: 50</Text>
+</View>
+\`\`\`
+
+**Expo** is the toolchain most teams start with — it handles the native build complexity for you and lets you preview your app on a real phone instantly via a QR code, without installing Xcode or Android Studio first.
+
+**Device features** (camera, location, push notifications) are available through Expo's modules, each with its own permission flow you have to request from the user explicitly.
+
+This is an optional deep-dive — the core skills from earlier lessons (components, state, props) transfer directly. What's different here is the rendering target and the styling system.`,
+      },
+    ],
+  },
+  {
+    id: 'course-backend-apis-node-d1',
+    categoryId: 'cat-backend',
+    slug: 'backend-apis-node-d1',
+    title: 'Backend APIs with Node & D1',
+    description: 'Run JavaScript on the server, expose REST APIs, persist data in Cloudflare D1, and lock it all down properly.',
+    level: 'intermediate',
+    lessons: [
+      {
+        title: 'Node.js fundamentals',
+        description: 'Running scripts, fs, NPM, HTTP server, streams.',
+        content: `# Node.js fundamentals
+
+Node.js runs JavaScript outside the browser — on a server, in a terminal, anywhere. That's what makes a JavaScript *backend* possible.
+
+**Running a script:** \`node server.js\` just executes the file top to bottom, same as any program.
+
+**npm** is Node's package manager. \`npm install express\` downloads a library and records it in \`package.json\` so anyone else can recreate your exact dependencies.
+
+**A minimal HTTP server (no framework):**
+\`\`\`js
+import http from "node:http";
+
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Hello from Node");
+}).listen(3000);
+\`\`\`
+
+Every web framework you'll use (Express, Hono, the one built into Cloudflare Workers) is ultimately this same idea — listen for a request, decide what to send back — with a lot of convenience layered on top.
+
+**Streams** let Node process data (a big file, a long response) in chunks instead of loading the whole thing into memory at once — important once you're past toy examples.`,
+      },
+      {
+        title: 'REST APIs with Express',
+        description: 'Routes, middleware, errors, status codes.',
+        content: `# REST APIs with Express
+
+Express is the most common Node framework for building APIs. A REST API exposes your data as URLs, where the HTTP method describes the action.
+
+\`\`\`js
+app.get("/courses", async (req, res) => {
+  const courses = await db.getAllCourses();
+  res.json(courses);
+});
+
+app.post("/courses", async (req, res) => {
+  const created = await db.createCourse(req.body);
+  res.status(201).json(created);
+});
+\`\`\`
+
+**Middleware** is code that runs *between* the request arriving and your route handler — for logging, parsing the request body, checking authentication:
+\`\`\`js
+app.use(express.json()); // parses JSON bodies into req.body
+\`\`\`
+
+**Status codes carry meaning** — don't return 200 for everything:
+- \`200\` OK, \`201\` Created
+- \`400\` Bad Request (the client sent something invalid)
+- \`401\` Unauthorized, \`403\` Forbidden
+- \`404\` Not Found
+- \`500\` Server Error (something broke on your end)
+
+Getting these right matters — the client code (and whoever debugs it later) relies on them to know what actually happened.`,
+      },
+      {
+        title: 'Data modeling',
+        description: 'Tables, schemas, CRUD, validation.',
+        content: `# Data modeling
+
+Before you write a single query, decide what your data actually looks like.
+
+**A schema** describes the shape of a record and its constraints:
+\`\`\`sql
+CREATE TABLE courses (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  level TEXT NOT NULL CHECK(level IN ('beginner','intermediate','advanced')),
+  token_cost INTEGER NOT NULL DEFAULT 1
+);
+\`\`\`
+
+**CRUD** is the four operations almost every table needs: Create, Read, Update, Delete. Design your API and your database access around those four from the start, rather than inventing a new pattern per table.
+
+**Validate at the boundary.** Never trust data coming from a client request — check it before it touches your database:
+\`\`\`js
+if (!body.title || typeof body.title !== "string") {
+  return res.status(400).json({ error: "title is required" });
+}
+\`\`\`
+
+**Relationships** matter as much as individual tables — a course belongs to a category, a lesson belongs to a course. Deciding those foreign keys up front saves you from painful migrations later.`,
+      },
+      {
+        title: 'Persisting with D1',
+        description: 'Cloudflare’s SQL database at the edge: queries and relationships.',
+        content: `# Persisting with D1
+
+D1 is Cloudflare's SQL database — it runs SQLite at the edge, right next to your Worker, so reads are fast with no separate database server to manage.
+
+**Running a query from a Worker:**
+\`\`\`js
+const { results } = await env.DB
+  .prepare("SELECT * FROM courses WHERE category_id = ?")
+  .bind(categoryId)
+  .all();
+\`\`\`
+
+\`.prepare()\` with \`.bind()\` is a *parameterized query* — the value is passed separately from the SQL text, which is what prevents SQL injection. Never build a query by pasting a variable directly into the SQL string.
+
+**Inserting and reading back an id:**
+\`\`\`js
+await env.DB
+  .prepare("INSERT INTO lessons (id, course_id, title, position) VALUES (?, ?, ?, ?)")
+  .bind(newId(), courseId, title, position)
+  .run();
+\`\`\`
+
+**Relationships in practice:** joining lessons to their course is just standard SQL —
+\`\`\`sql
+SELECT l.*, c.title as course_title
+FROM lessons l JOIN courses c ON l.course_id = c.id
+WHERE l.course_id = ?
+\`\`\`
+
+D1 is genuinely SQL — if you know SQLite, you already know D1. The only new thing is the binding API for talking to it from a Worker.`,
+      },
+      {
+        title: 'Auth and security',
+        description: 'Password hashing, sessions, cookies, CORS, CSRF.',
+        content: `# Auth and security
+
+**Never store plaintext passwords.** Hash them with a slow, salted algorithm (bcrypt, or PBKDF2 as used in this platform) so that even if your database leaks, passwords aren't directly exposed.
+
+\`\`\`js
+const hash = await hashPassword(plainTextPassword);
+// store hash, never the original password
+\`\`\`
+
+**Sessions vs tokens:** a session is a random ID stored server-side (in a database) and handed to the browser as a cookie. The server looks up that ID on every request to know who's asking.
+
+**Cookies should be:**
+- \`httpOnly\` — JavaScript in the browser can't read it, which blocks a whole class of token-theft attacks
+- \`sameSite: "lax"\` or stricter — limits when the cookie gets sent on cross-site requests
+
+**CORS** (Cross-Origin Resource Sharing) controls which *other* websites are allowed to call your API from a browser. If you don't set it, browsers block cross-origin requests by default — which is usually what you want unless you're deliberately building a public API.
+
+**CSRF** is an attack where a malicious site tricks a logged-in user's browser into making a request to your API. \`sameSite\` cookies are your main defense against it in most modern apps.`,
+      },
+    ],
+  },
+  {
+    id: 'course-ai-integration',
+    categoryId: 'cat-ai-ml',
+    slug: 'integrating-ai-real-products',
+    title: 'Integrating AI into Real Products',
+    description: 'Move beyond toy demos. Wire large language models into production apps: streaming, structured output, retrieval, and the patterns that keep it reliable.',
+    level: 'intermediate',
+    lessons: [
+      {
+        title: 'Consuming APIs',
+        description: 'fetch, async patterns, error handling, in a real app context.',
+        content: `# Consuming APIs (in a real app)
+
+You've called \`fetch\` before — this lesson is about doing it like production code, not a demo.
+
+**Centralize your API calls** instead of scattering \`fetch\` everywhere:
+\`\`\`ts
+async function callModel(prompt: string) {
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error(\`AI call failed: \${res.status}\`);
+  return res.json();
+}
+\`\`\`
+
+**Handle three failure modes, not just one:**
+1. The network request fails outright (offline, DNS, timeout)
+2. The request succeeds but the server returns an error status
+3. The request "succeeds" but the body isn't what you expected (bad JSON, unexpected shape)
+
+**Retry carefully, not blindly.** A failed AI call might be worth retrying once with backoff — but retrying a request that costs money on every attempt, in a tight loop, can run up a bill fast. Always cap retries and never retry on a 4xx (client error) status — that's not a transient failure, the request itself was wrong.`,
+      },
+      {
+        title: 'Calling LLM APIs',
+        description: 'Models, messages, and the parameters that change behavior.',
+        content: `# Calling LLM APIs
+
+Most modern LLM APIs share the same basic shape: a list of messages, a model name, and a handful of parameters that shape the output.
+
+\`\`\`json
+{
+  "model": "claude-sonnet-4-6",
+  "messages": [
+    { "role": "user", "content": "Summarize this in two sentences: ..." }
+  ],
+  "max_tokens": 300,
+  "temperature": 0.3
+}
+\`\`\`
+
+**Roles** separate who said what — \`system\` sets behavior/instructions for the whole conversation, \`user\` is the human, \`assistant\` is the model's own prior replies (useful for multi-turn context).
+
+**Temperature** controls randomness: low (0–0.3) for consistent, predictable output like data extraction; higher (0.7+) for creative writing where variety is good.
+
+**max_tokens** caps the length of the response — and you pay (in latency and often in cost) for tokens generated, so don't set it far higher than you need.
+
+**System prompts are your main lever for behavior** — "You are a strict JSON-only API, never include prose" changes the model's output far more reliably than asking nicely in the user message.`,
+      },
+      {
+        title: 'Streaming and structured output',
+        description: 'Streaming responses, and parsing JSON-mode output reliably.',
+        content: `# Streaming and structured output
+
+**Streaming** sends the model's response back token by token instead of waiting for the whole thing — this is why ChatGPT-style UIs show text appearing word by word instead of a long pause then a wall of text.
+
+\`\`\`ts
+const stream = await client.messages.stream({ ... });
+for await (const event of stream) {
+  if (event.type === "content_block_delta") {
+    appendToUI(event.delta.text);
+  }
+}
+\`\`\`
+
+It dramatically improves perceived speed even though the total time is similar.
+
+**Structured output** means asking the model to return data in a specific shape (usually JSON) instead of free text, so your code can parse it directly:
+
+\`\`\`
+Return ONLY valid JSON matching: { "score": number, "reasons": string[] }
+\`\`\`
+
+**Always parse defensively** — even with a clear instruction, models occasionally wrap JSON in markdown fences or add a sentence before it:
+\`\`\`ts
+const match = text.match(/\\{[\\s\\S]*\\}/);
+const data = JSON.parse(match?.[0] ?? "{}");
+\`\`\`
+
+Some APIs offer a dedicated "JSON mode" that guarantees valid JSON — prefer that over prompting alone when it's available.`,
+      },
+      {
+        title: 'Embeddings and retrieval (RAG)',
+        description: 'Vector search and grounding model answers in your own data.',
+        content: `# Embeddings and retrieval (RAG)
+
+An LLM only knows what it was trained on — it doesn't know your app's data. RAG (Retrieval-Augmented Generation) fixes that by fetching relevant information first, then handing it to the model as context.
+
+**Embeddings** turn text into a list of numbers (a vector) that captures its *meaning* — similar meanings produce similar vectors, even with completely different words.
+
+**The RAG loop:**
+1. Turn the user's question into an embedding
+2. Search your stored content for the embeddings closest to it (a "vector search")
+3. Pull the matching text out
+4. Hand that text to the model: "Using only the following context, answer: ..."
+
+\`\`\`
+Context:
+"""
+[retrieved course descriptions]
+"""
+Question: Which course teaches deployment?
+\`\`\`
+
+**Why this matters:** it lets the model answer accurately about *your* courses, *your* docs, *your* product — things it was never trained on — and it dramatically reduces made-up answers, because the model is grounding its response in text you actually gave it rather than guessing from memory.`,
+      },
+      {
+        title: 'AI app patterns',
+        description: 'Tool use, guardrails, cost and latency tradeoffs.',
+        content: `# AI app patterns
+
+**Tool use** lets a model call functions you define instead of only generating text — "check the weather," "look up this order," "search the database" — and use the result in its answer. You describe the available tools; the model decides when to call one and with what arguments; your code actually executes it.
+
+**Guardrails** are the checks you put around model output before it reaches a user or a downstream system:
+- Validate structured output against a schema before trusting it
+- Cap what actions a tool-calling model can take autonomously (don't let it delete data without confirmation)
+- Have a fallback path for when the model's response doesn't make sense
+
+**Cost and latency are real product constraints, not afterthoughts:**
+- Bigger/smarter models cost more and respond slower — match the model to the task (a quick classification doesn't need your most expensive model)
+- Cache results when the same input will produce the same useful output
+- Stream output for anything that takes more than a second or two, so the user sees progress
+
+Treat the model like an unreliable but talented contractor: give it clear instructions, check its work, and don't hand it the keys to anything irreversible without a check in between.`,
+      },
+      {
+        title: 'Prompt engineering in depth',
+        description: 'Reliability, evaluation, and iterating on prompts like code.',
+        content: `# Prompt engineering in depth
+
+Once a prompt matters for a real feature, treat it like code: version it, test it, and watch for regressions.
+
+**Write a few test cases before you tune the prompt** — inputs you know the right answer for. Every time you change the prompt, re-run them. It's easy to "fix" one case and silently break another.
+
+**Few-shot examples** (showing the model 2-3 example input/output pairs in the prompt) often improve reliability more than longer instructions:
+\`\`\`
+Input: "broken login button"
+Output: { "category": "bug", "priority": "high" }
+
+Input: "add dark mode"
+Output: { "category": "feature", "priority": "low" }
+
+Input: "{{user_input}}"
+Output:
+\`\`\`
+
+**Decompose hard prompts.** A single prompt trying to do five things reliably is harder to get right than five smaller, focused prompts chained together — even though it's more API calls.
+
+**Evaluation isn't optional for anything that ships.** Even a rough scoring rubric you check by hand against 20 real examples will catch problems that "it looked fine when I tried it twice" never will.`,
+      },
+    ],
+  },
+  {
+    id: 'course-devops-cloudflare',
+    categoryId: 'cat-devops',
+    slug: 'deploy-scale-cloudflare',
+    title: 'Deploy & Scale on Cloudflare',
+    description: 'Ship to the edge: Cloudflare Workers, Pages, D1, R2, and the CI/CD pipeline that gets your code there safely.',
+    level: 'intermediate',
+    lessons: [
+      {
+        title: 'Rendering strategies',
+        description: 'CSR vs SSR vs SSG and when to use each.',
+        content: `# Rendering strategies
+
+**Client-Side Rendering (CSR):** the browser downloads a near-empty HTML page plus a JS bundle, then JavaScript builds the actual UI. Fast to build, but the first paint is slower and search engines historically struggled with it.
+
+**Server-Side Rendering (SSR):** the server renders the actual HTML for each request and sends it ready to display, then JavaScript "hydrates" it to make it interactive. Faster first paint, better for SEO, more server work per request.
+
+**Static Site Generation (SSG):** pages are rendered to HTML *at build time*, before any user ever asks for them, then served as static files. Extremely fast and cheap to serve, but the content is fixed until you rebuild.
+
+**Picking one:**
+- Marketing pages, blogs → SSG (content rarely changes per-request)
+- Dashboards, personalized content → SSR or CSR (content depends on who's asking)
+- Most real apps mix all three per-route, which is exactly what modern frameworks like TanStack Start let you do — choose per page, not per app.`,
+      },
+      {
+        title: 'Routing and meta-frameworks',
+        description: 'File-based routing and API routes.',
+        content: `# Routing and meta-frameworks
+
+A "meta-framework" sits on top of a UI library (React, etc.) and adds the things every real app needs: routing, data loading, server functions — instead of you assembling them from separate libraries.
+
+**File-based routing** maps your folder structure directly to URLs:
+\`\`\`
+routes/courses.tsx          → /courses
+routes/courses.$slug.tsx    → /courses/:slug
+routes/admin.tsx            → /admin
+\`\`\`
+
+The framework reads the file tree and builds the route map for you — no separate router config to keep in sync.
+
+**API/server routes** let you write backend logic in the same project, often the same file, as your frontend:
+\`\`\`ts
+export const Route = createFileRoute('/api/stripe-webhook')({ ... })
+\`\`\`
+
+This is what removes the need for a totally separate backend service for most apps — your "backend" is just the server functions living next to your routes, deployed as one unit.`,
+      },
+      {
+        title: 'CI/CD pipelines',
+        description: 'Automated test and deploy, with GitHub Actions.',
+        content: `# CI/CD pipelines
+
+CI (Continuous Integration) runs your checks — type checking, tests, linting — automatically on every push, so problems are caught before they reach anyone else. CD (Continuous Deployment) takes a build that passes those checks and ships it automatically.
+
+**A minimal GitHub Actions workflow:**
+\`\`\`yaml
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install
+      - run: npm run build
+      - run: npx wrangler deploy
+\`\`\`
+
+**Why this matters even solo:** it's a second pair of eyes that never gets tired. "It worked on my machine" stops being good enough once a pipeline runs the exact same checks every single time, the same way, with nothing skipped.
+
+**Good pipeline hygiene:**
+- Fail fast — run the cheapest checks (linting) before the expensive ones (full test suite)
+- Never put secrets in the workflow file — use the platform's secret store
+- Deploy from a single branch (usually \`main\`) so there's one source of truth for what's live`,
+      },
+      {
+        title: 'Cloudflare Workers and Pages',
+        description: 'Edge functions, static hosting, and the Wrangler CLI.',
+        content: `# Cloudflare Workers and Pages
+
+**Cloudflare Workers** run your code at the edge — in data centers close to the user, not one central server — so requests are fast everywhere, not just near your server's home region. A Worker is just a \`fetch\` handler:
+
+\`\`\`js
+export default {
+  async fetch(request, env, ctx) {
+    return new Response("Hello from the edge");
+  },
+};
+\`\`\`
+
+**Pages** serves your static assets (the built HTML/CSS/JS) alongside a Worker for any dynamic parts — exactly the setup this platform itself uses (Workers Assets + a Worker for server logic).
+
+**Wrangler** is the CLI that ties it together:
+\`\`\`bash
+wrangler dev      # run locally, with real bindings emulated
+wrangler deploy   # ship it
+wrangler tail     # stream live logs from production
+\`\`\`
+
+**wrangler.jsonc** is where you declare what your Worker has access to — D1 databases, KV namespaces, environment variables — so the binding is explicit and version-controlled, not configured by clicking around a dashboard.`,
+      },
+      {
+        title: 'D1 and R2',
+        description: 'Edge SQL database, plus object storage for files.',
+        content: `# D1 and R2
+
+**D1** is Cloudflare's SQL database (covered in depth in the Backend course) — your relational data: users, courses, lessons, transactions.
+
+**R2** is object storage — for files: images, videos, PDFs, anything that isn't a row of structured data. It's API-compatible with S3, so most S3 tooling works against it with minor config changes, and critically: **no egress fees**, meaning you don't pay extra every time someone downloads a file.
+
+**A typical split in a real app:**
+- D1: "this user enrolled in this course on this date"
+- R2: the actual video file, the lesson's PDF handout, a user's uploaded avatar
+
+**Binding R2 in a Worker:**
+\`\`\`js
+await env.MY_BUCKET.put("lesson-1-video.mp4", fileData);
+const file = await env.MY_BUCKET.get("lesson-1-video.mp4");
+\`\`\`
+
+**Why not just put everything in D1?** Databases are built for structured, queryable rows — not for storing large binary blobs efficiently. Splitting structured data (D1) from large files (R2) is the standard pattern, not a Cloudflare-specific quirk — it's true of SQL databases in general.`,
+      },
+      {
+        title: 'E2E testing in the pipeline',
+        description: 'Playwright, regression coverage, and what to test end-to-end.',
+        content: `# E2E testing in the pipeline
+
+Unit tests check one function in isolation. End-to-end (E2E) tests drive your *actual running app* like a real user would — clicking buttons, filling forms, checking what appears — catching bugs that only show up when all the pieces work together.
+
+**A Playwright test:**
+\`\`\`ts
+test("user can sign up", async ({ page }) => {
+  await page.goto("/auth");
+  await page.fill("#su-email", "test@example.com");
+  await page.fill("#su-password", "Password123");
+  await page.click('button:has-text("Create Account")');
+  await expect(page).toHaveURL(/dashboard/);
+});
+\`\`\`
+
+**What's worth covering end-to-end:** the handful of flows that would genuinely hurt if they broke — signing up, paying, the core action of your product. Not every button on every page; that's what unit tests are for.
+
+**Running E2E tests in CI** means they run headless against a freshly built version of the app on every push — the exact regression check that catches "I refactored the auth form and silently broke sign-up" before it reaches anyone real.`,
+      },
+    ],
+  },
+  {
+    id: 'course-ui-design-figma',
+    categoryId: 'cat-design',
+    slug: 'design-systems-figma',
+    title: 'Design Systems in Figma',
+    description: 'Tokens, components, layouts, and developer handoff. Design clean, professional screens before you build them.',
+    level: 'beginner',
+    lessons: [
+      {
+        title: 'Design tokens',
+        description: 'Color, type, and spacing scales.',
+        content: `# Design tokens
+
+A design token is a named, reusable design decision — a color, a font size, a spacing value — instead of a one-off hex code typed into a hundred different places.
+
+**Color tokens:**
+\`primary\`, \`muted-foreground\`, \`destructive\` — name colors by *role*, not by appearance. "primary" can be redefined for a dark theme without renaming anything that uses it; "teal-500" can't.
+
+**Type scale:** a small fixed set of font sizes (e.g. 12 / 14 / 16 / 20 / 24 / 32px) used consistently, instead of picking a slightly different size every time. Consistency is what makes a UI feel designed rather than improvised.
+
+**Spacing scale:** the same idea for margins and padding — a scale like 4 / 8 / 12 / 16 / 24 / 32px covers almost every case, and sticking to it is what makes spacing feel intentional rather than random.
+
+**Why this matters for handoff:** when a developer asks "what color is this," the answer should be a token name they can find in code (\`text-primary\`), not "whatever hex value looked right in this one spot."`,
+      },
+      {
+        title: 'Components and variants',
+        description: 'Reusable, state-aware design components.',
+        content: `# Components and variants
+
+A Figma **component** is a reusable piece of UI — a button, a card, an input — defined once and placed many times. Change the original (the "main component") and every placed instance updates automatically.
+
+**Variants** group related versions of the same component into one switchable set:
+- A button with variants for \`primary\` / \`outline\` / \`ghost\`
+- The same button with variants for \`default\` / \`hover\` / \`disabled\` / \`loading\`
+
+Instead of five separate disconnected button shapes floating around the file, you get one component with a dropdown to switch states — which mirrors exactly how a developer will build it in code (one component, a \`variant\` prop).
+
+**Design every state, not just the happy path.** What does this button look like while it's loading? What does this input look like with a validation error? If you don't design it, a developer invents it on the spot — and it usually doesn't match the rest of the system.
+
+Designing in components from day one is what makes a "design system" a system, rather than just a folder of mockups.`,
+      },
+      {
+        title: 'Layouts and auto-layout',
+        description: 'Responsive structure and constraints.',
+        content: `# Layouts and auto-layout
+
+**Auto-layout** is Figma's version of Flexbox — a frame that arranges its children in a row or column, with consistent spacing and padding, and resizes automatically as content changes.
+
+This matters because it's the difference between a mockup that *looks* responsive and one that actually behaves correctly when content changes — add a longer button label, and an auto-layout frame grows to fit it instead of the text overflowing.
+
+**Constraints** control how an element behaves when its parent frame resizes — pin to the left, stretch to fill, center regardless of width. Without constraints set deliberately, resizing a frame just stretches everything uniformly, which rarely looks right.
+
+**Designing with real layout behavior in mind (not just a fixed 1440px canvas)** is what makes a design translate cleanly to code. A developer building from auto-layout frames with sensible constraints can usually map them almost directly to Flexbox/Grid CSS — a design that's just absolutely-positioned shapes can't be implemented that way at all.`,
+      },
+      {
+        title: 'Developer handoff',
+        description: 'Specs, exports, and design-to-code communication.',
+        content: `# Developer handoff
+
+The goal of handoff is that a developer can build your design without having to guess or ask you the same five questions for every screen.
+
+**What a developer needs from you:**
+- Spacing and sizing values (Figma's Inspect panel shows exact pixel values on selection)
+- The exact tokens used (color, type, spacing) by name, not just by appearance
+- Every state of every interactive component — not just the default
+- Exported assets (icons, illustrations) in the format the codebase actually uses (usually SVG for icons)
+
+**Annotate intent, not just appearance.** "This list is empty-state-aware — show the empty illustration when there are zero items" tells a developer something a static mockup of the populated list never will.
+
+**The best handoff isn't a bigger spec document — it's a smaller gap between design and code from the start:** using the same token names the codebase uses, designing every state, and treating components in Figma as the same unit of reuse a developer will use in React. The closer those two systems mirror each other, the less "handoff" there is to do at all.`,
+      },
+    ],
+  },
+]

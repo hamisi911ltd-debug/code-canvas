@@ -1,17 +1,22 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { z } from 'zod'
-import { getCategories, getCourses } from '@/server-functions/data'
+import { getCourses } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { useState } from 'react'
-import { Search, Play, BookOpen } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 
-const search = z.object({ category: z.string().optional(), q: z.string().optional() })
+// Same illustrated photos used on the landing page and course/track detail pages,
+// keyed by category slug — used for any course without its own admin-set thumbnail_url.
+const CATEGORY_PHOTOS: Record<string, string> = {
+  vibecoding: '/photo.png',
+  frontend: '/photo..png',
+  'ai-ml': '/photo...png',
+  backend: '/photo....png',
+  devops: '/photo5.svg',
+  design: '/photo6.svg',
+}
+
 export const Route = createFileRoute('/courses/')({
   component: CoursesPage,
-  validateSearch: (s) => search.parse(s),
   head: () => ({
     meta: [
       { title: "Online Coding Courses | React, TypeScript, AI Development — VIBELEARN" },
@@ -23,58 +28,16 @@ export const Route = createFileRoute('/courses/')({
 })
 
 function CoursesPage() {
-  const { category, q: initialQ } = Route.useSearch()
-  const [q, setQ] = useState(initialQ ?? '')
-
-  const { data: categories } = useQuery({
-    queryKey: ['categories'],
-    queryFn: () => getCategories(),
-  })
-
   const { data: courses, isLoading } = useQuery({
-    queryKey: ['courses', category],
-    queryFn: () => getCourses({ data: { categorySlug: category } }),
+    queryKey: ['courses'],
+    queryFn: () => getCourses({ data: {} }),
   })
 
-  const filtered = (courses ?? []).filter(
-    (c: any) =>
-      !q ||
-      c.title.toLowerCase().includes(q.toLowerCase()) ||
-      (c.description ?? '').toLowerCase().includes(q.toLowerCase()),
-  )
+  const filtered = courses ?? []
 
   return (
     <PageShell>
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-5 sm:pt-8 pb-3">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses…" className="pl-10 h-11 bg-card border-border" />
-          </div>
-          <h1 className="font-display text-lg sm:text-2xl font-bold shrink-0">All courses</h1>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 py-4 sm:py-6">
-        <div className="flex flex-wrap gap-2 mb-8">
-          <Link
-            to="/courses"
-            className={`px-3 py-1.5 rounded-full text-sm border transition ${!category ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
-          >
-            All
-          </Link>
-          {(categories ?? []).map((c) => (
-            <Link
-              key={c.id}
-              to="/courses"
-              search={{ category: c.slug }}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${category === c.slug ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/50'}`}
-            >
-              {c.name}
-            </Link>
-          ))}
-        </div>
-
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
         {isLoading ? (
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => <div key={i} className="h-48 sm:h-72 rounded-2xl bg-muted/40 animate-pulse" />)}
@@ -93,15 +56,12 @@ function CoursesPage() {
                 params={{ slug: c.slug }}
                 className="group rounded-xl sm:rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition card-glass"
               >
-                <div className="aspect-video relative bg-gradient-to-br from-primary/20 via-accent/10 to-transparent overflow-hidden">
-                  {c.thumbnail_url ? (
-                    <img src={c.thumbnail_url} alt={c.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 grid place-items-center">
-                      <Play className="h-7 w-7 sm:h-12 sm:w-12 text-primary/40" />
-                    </div>
-                  )}
-                  <Badge className="absolute top-2 left-2 bg-background/80 backdrop-blur border-border capitalize text-[10px] sm:text-xs px-1.5 py-0.5">{c.level}</Badge>
+                <div className="aspect-video relative overflow-hidden bg-muted/20">
+                  <img
+                    src={c.thumbnail_url || CATEGORY_PHOTOS[c.categories?.slug] || '/photo.png'}
+                    alt={c.title}
+                    className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                  />
                 </div>
                 <div className="p-2.5 sm:p-5">
                   <div className="text-[10px] sm:text-xs text-primary uppercase tracking-wider">{c.categories?.name ?? 'General'}</div>

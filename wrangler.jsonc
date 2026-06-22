@@ -15,9 +15,6 @@
     }
   ],
   "vars": {
-    "STRIPE_SECRET_KEY": "",
-    "STRIPE_WEBHOOK_SECRET": "",
-    "INTASEND_SECRET_KEY": "",
-    "INTASEND_PUBLISHABLE_KEY": ""
+    "ADMIN_EMAIL": "hamisi.911.ltd@gmail.com"
   }
 }

@@ -1,7 +1,13 @@
 import { getDB, newId } from '@/db/index'
+import { getCfEnv } from './cf-context'
 
-const ADMIN_EMAIL = 'gakwelihamisi@gmail.com'
+const DEFAULT_ADMIN_EMAIL = 'gakwelihamisi@gmail.com'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+export function isAdminEmail(email: string): boolean {
+  const adminEmail = getCfEnv().ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL
+  return email.toLowerCase() === adminEmail.toLowerCase()
+}
 
 export interface SessionUser {
   id: string
@@ -80,7 +86,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 
 export async function ensureAdminRole(userId: string, email: string): Promise<void> {
-  if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return
+  if (!isAdminEmail(email)) return
   const db = getDB()
   await db.prepare('INSERT OR IGNORE INTO user_roles (user_id, role) VALUES (?, ?)').bind(userId, 'admin').run()
 }
