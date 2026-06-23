@@ -17,6 +17,8 @@ export const APIRoute = createAPIFileRoute('/api/diagnose-intasend')({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'VibeLearn/1.0 (+https://vlapp.glotech.workers.dev)',
         Authorization: `Bearer ${secretKey}`,
       },
       body: JSON.stringify({ amount: 0, phone_number: 'invalid', currency: 'KES', api_ref: 'diagnostic-test' }),

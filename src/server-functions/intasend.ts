@@ -4,7 +4,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
 import { getDB, newId } from '@/db/index'
 import { getSession } from '@/lib/auth'
-import { getIntaSendConfig, normalizeKenyanPhone } from '@/lib/intasend'
+import { normalizeKenyanPhone, startMpesaStkPush, getMpesaPaymentState, IntaSendError } from '@/lib/intasend'
 
 const KES_PER_TOKEN = 50
 
@@ -15,51 +15,32 @@ async function requireAuth() {
   return user
 }
 
-// IntaSend (or an edge in front of it) can return a plain-text error body instead of JSON —
-// parse defensively so we surface that text instead of a confusing "Unexpected token" crash.
-async function safeJson(res: Response): Promise<any> {
-  const text = await res.text()
-  try {
-    return JSON.parse(text)
-  } catch {
-    throw new Error(`IntaSend returned a non-JSON response (HTTP ${res.status}): ${text.slice(0, 200)}`)
-  }
-}
-
 export const initiateMpesaPayment = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => d as { phoneNumber: string; tokens: number })
   .handler(async ({ data }) => {
     const user = await requireAuth()
     const db = getDB()
-    const { secretKey, baseUrl } = getIntaSendConfig()
     const phone = normalizeKenyanPhone(data.phoneNumber)
     const tokens = Math.max(1, Math.round(data.tokens))
     const amount = tokens * KES_PER_TOKEN
 
     const [firstName, ...lastNameParts] = (user.display_name ?? 'VibeLearn Student').trim().split(/\s+/)
 
-    const res = await fetch(`${baseUrl}/api/v1/payment/mpesa-stk-push/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${secretKey}`,
-      },
-      body: JSON.stringify({
+    let invoiceId: string
+    try {
+      const result = await startMpesaStkPush({
         amount,
-        phone_number: phone,
+        phoneNumber: phone,
         email: user.email,
-        first_name: firstName,
-        last_name: lastNameParts.join(' ') || firstName,
-        currency: 'KES',
-        api_ref: `tokens-${tokens}-${user.id}`,
+        firstName,
+        lastName: lastNameParts.join(' ') || firstName,
+        apiRef: `tokens-${tokens}-${user.id}`,
         narrative: `${tokens} VibeLearn token${tokens === 1 ? '' : 's'}`,
-      }),
-    })
-
-    const json = await safeJson(res)
-    const invoiceId = json?.invoice?.invoice_id as string | undefined
-    if (!res.ok || !invoiceId) {
-      throw new Error(json?.detail ?? json?.message ?? 'Failed to start M-Pesa payment')
+      })
+      invoiceId = result.invoiceId
+    } catch (e) {
+      if (e instanceof IntaSendError) throw new Error(e.message)
+      throw e
     }
 
     await db
@@ -85,17 +66,13 @@ export const checkMpesaPaymentStatus = createServerFn({ method: 'POST' })
     if (!payment) throw new Error('Payment not found')
     if (payment.status !== 'pending') return { status: payment.status }
 
-    const { secretKey, baseUrl } = getIntaSendConfig()
-    const res = await fetch(`${baseUrl}/api/v1/payment/status/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${secretKey}`,
-      },
-      body: JSON.stringify({ invoice_id: data.invoiceId }),
-    })
-    const json = await safeJson(res)
-    const state = json?.invoice?.state as string | undefined
+    let state: string | undefined
+    try {
+      state = await getMpesaPaymentState(data.invoiceId)
+    } catch (e) {
+      if (e instanceof IntaSendError) throw new Error(e.message)
+      throw e
+    }
 
     if (state === 'COMPLETE') {
       // UNIQUE on invoice_id + status guard prevents double-credit if polled concurrently
