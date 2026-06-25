@@ -2,7 +2,8 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
-import { getDB } from '@/db/index'
+import { getDB, newId } from '@/db/index'
+import { getCfEnv } from '@/lib/cf-context'
 import { getSession } from '@/lib/auth'
 
 async function requireAuth() {
@@ -26,4 +27,27 @@ export const getMpesaPaymentStatus = createServerFn({ method: 'POST' })
       .first<{ status: 'pending' | 'complete' | 'failed' }>()
 
     return { status: payment?.status ?? ('pending' as const) }
+  })
+
+export const getIntaSendPublishableKey = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+  const env = getCfEnv()
+  return {
+    key: String(env.VITE_INTASEND_PUBLISHABLE_KEY ?? env.INTASEND_PUBLISHABLE_KEY ?? ''),
+  }
+})
+
+export const devGrantTokens = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { tokens: number })
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const db = getDB()
+    const amount = Math.max(0, data.tokens)
+    if (!amount) throw new Error('Token amount must be greater than 0')
+
+    await db
+      .prepare('INSERT INTO token_transactions (id, user_id, amount, type, description) VALUES (?, ?, ?, ?, ?)')
+      .bind(newId(), user.id, amount, 'grant', `Local dev grant of ${amount} tokens`) 
+      .run()
+
+    return { status: 'complete' as const }
   })

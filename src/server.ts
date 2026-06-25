@@ -22,8 +22,11 @@ async function handleIntaSendWebhook(request: Request): Promise<Response> {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  if (payload.challenge !== undefined && !verifyIntaSendWebhook(payload)) {
-    return new Response("Invalid challenge", { status: 401 });
+  if (payload.challenge !== undefined) {
+    if (!verifyIntaSendWebhook(payload)) {
+      return new Response("Invalid challenge", { status: 401 });
+    }
+    return new Response(String(payload.challenge), { status: 200 });
   }
 
   const state = payload.state as string | undefined;
@@ -37,8 +40,12 @@ async function handleIntaSendWebhook(request: Request): Promise<Response> {
   if (!parsed) return new Response("OK", { status: 200 });
 
   const amount = Number(payload.value ?? payload.net_amount ?? 0);
-  const phoneNumber = (payload.account as string | undefined) ?? "";
-  const status = state === "COMPLETE" ? "complete" : "failed";
+  const phoneNumber =
+    (payload.account as string | undefined) ??
+    (payload.phone as string | undefined) ??
+    (payload.phone_number as string | undefined) ??
+    ""
+  const status = state === "COMPLETE" || state === "COMPLETED" ? "complete" : "failed";
 
   const db = getDB();
   // INSERT OR IGNORE keyed on invoice_id's UNIQUE constraint makes this idempotent —

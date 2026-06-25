@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Coins, ShieldCheck, Loader2 } from 'lucide-react'
-import { getMpesaPaymentStatus } from '@/server-functions/intasend'
+import { getIntaSendPublishableKey, getMpesaPaymentStatus, devGrantTokens } from '@/server-functions/intasend'
 import { useAuth } from '@/hooks/useAuth'
 import type IntaSend from 'intasend-inlinejs-sdk'
 
@@ -41,6 +41,19 @@ export function BuyTokens({
   const [apiRef, setApiRef] = useState<string | null>(null)
   const intaSendRef = useRef<IntaSend | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const buildPubKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY as string | undefined
+  const isDevMode = import.meta.env.DEV
+  const runtimeKeyQuery = useQuery({
+    queryKey: ['intasend-publishable-key'],
+    queryFn: () => getIntaSendPublishableKey(),
+    enabled: !buildPubKey,
+    staleTime: Infinity,
+    cacheTime: Infinity,
+  })
+  const runtimePubKey = buildPubKey ?? runtimeKeyQuery.data?.key
+  const publicAPIKey = runtimePubKey?.trim() || undefined
+  const keyLoading = !buildPubKey && runtimeKeyQuery.isLoading
+  const devFallbackEnabled = isDevMode && !publicAPIKey && !keyLoading
 
   // The SDK appends its iframe into the container via document.getElementById,
   // outside React's render cycle — observe for that child showing up so we can
@@ -67,15 +80,21 @@ export function BuyTokens({
   }, [step])
 
   useEffect(() => {
+    if (keyLoading) return
     let cancelled = false
+    if (!publicAPIKey) {
+      if (devFallbackEnabled) {
+        toast.warning('Missing IntaSend publishable key. Using local dev token grant fallback.')
+        setSdkReady(true)
+      } else {
+        toast.error('Missing IntaSend publishable key. Check your env configuration.')
+      }
+      return
+    }
+
     import('intasend-inlinejs-sdk')
       .then(({ default: IntaSend }) => {
         if (cancelled) return
-        const publicAPIKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY as string | undefined
-        if (!publicAPIKey) {
-          toast.error('Missing IntaSend publishable key. Check your env configuration.')
-          return
-        }
         intaSendRef.current = new IntaSend({
           publicAPIKey,
           live: publicAPIKey.includes('_live_'),
@@ -120,8 +139,30 @@ export function BuyTokens({
 
   const amount = tokens * KES_PER_TOKEN
 
+  const devGrantMutation = useMutation({
+    mutationFn: ({ tokens }: { tokens: number }) => devGrantTokens({ data: { tokens } }),
+    onSuccess: () => {
+      toast.success(`${tokens} token${tokens === 1 ? '' : 's'} added!`)
+      onPurchased()
+    },
+    onError: (error) => {
+      console.error('Dev token grant failed', error)
+      toast.error('Unable to grant tokens locally. Check your network connection.')
+    },
+  })
+
   const handlePayNow = () => {
-    if (!user || !sdkReady || !intaSendRef.current) {
+    if (!user) {
+      toast.error('You must be signed in to purchase tokens.')
+      return
+    }
+
+    if (devFallbackEnabled) {
+      devGrantMutation.mutate({ tokens })
+      return
+    }
+
+    if (!sdkReady || !intaSendRef.current) {
       toast.error('Payment checkout is not ready. Please try again in a moment.')
       return
     }
@@ -187,14 +228,27 @@ export function BuyTokens({
           </div>
         </div>
 
+        {devFallbackEnabled ? (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Developer fallback active</p>
+            <p className="mt-1">
+              `VITE_INTASEND_PUBLISHABLE_KEY` is not configured, so purchases will be granted locally for testing only.
+            </p>
+          </div>
+        ) : null}
+
         {step === 'summary' ? (
           <Button
             onClick={handlePayNow}
             size="lg"
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            disabled={!sdkReady}
+            disabled={!sdkReady || devGrantMutation.isLoading}
           >
-            {sdkReady ? `Pay KES ${amount}` : 'Loading payment checkout…'}
+            {devFallbackEnabled
+              ? `Grant ${tokens} token${tokens === 1 ? '' : 's'} locally`
+              : sdkReady
+              ? `Pay KES ${amount}`
+              : 'Loading payment checkout…'}
           </Button>
         ) : (
           <div
