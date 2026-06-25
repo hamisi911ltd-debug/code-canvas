@@ -254,30 +254,93 @@ export const getEnrollment = createServerFn({ method: 'GET', strict: false })
     return db.prepare('SELECT * FROM enrollments WHERE user_id = ? AND course_id = ?').bind(user.id, data.courseId).first()
   })
 
+// Enrolling is free — the paywall lives at the module level now (see unlockModule).
 export const enroll = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => d as { courseId: string })
   .handler(async ({ data }) => {
     const user = await requireAuth()
     const db = getDB()
+    await db.prepare('INSERT OR IGNORE INTO enrollments (id, user_id, course_id) VALUES (?, ?, ?)').bind(newId(), user.id, data.courseId).run()
+  })
 
-    const existing = await db.prepare('SELECT 1 FROM enrollments WHERE user_id = ? AND course_id = ?').bind(user.id, data.courseId).first()
+// ── MODULES ──────────────────────────────────────────────────────────────────
+
+export const getModules = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { courseId: string })
+  .handler(async ({ data }) => {
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+    const db = getDB()
+    const { results } = await db
+      .prepare(
+        `SELECT m.*,
+           (SELECT COUNT(*) FROM lessons l WHERE l.module_id = m.id) as lesson_count,
+           EXISTS(SELECT 1 FROM module_unlocks u WHERE u.module_id = m.id AND u.user_id = ?) as unlocked
+         FROM modules m WHERE m.course_id = ? ORDER BY m.position`,
+      )
+      .bind(sessionUser?.id ?? '', data.courseId)
+      .all<Record<string, unknown>>()
+    return (results ?? []).map((m) => ({ ...m, unlocked: !!m.unlocked }))
+  })
+
+export const unlockModule = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { moduleId: string })
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const db = getDB()
+
+    const existing = await db.prepare('SELECT 1 FROM module_unlocks WHERE user_id = ? AND module_id = ?').bind(user.id, data.moduleId).first()
     if (existing) return
 
-    const course = await db.prepare('SELECT token_cost FROM courses WHERE id = ?').bind(data.courseId).first<{ token_cost: number }>()
-    if (!course) throw new Error('Course not found')
+    const module_ = await db.prepare('SELECT token_cost FROM modules WHERE id = ?').bind(data.moduleId).first<{ token_cost: number }>()
+    if (!module_) throw new Error('Module not found')
 
-    const cost = course.token_cost ?? 0
+    const cost = module_.token_cost ?? 0
     if (cost > 0) {
       const row = await db.prepare('SELECT COALESCE(SUM(amount), 0) as balance FROM token_transactions WHERE user_id = ?').bind(user.id).first<{ balance: number }>()
       const balance = row?.balance ?? 0
-      if (balance < cost) throw new Error(`This course costs ${cost} token${cost === 1 ? '' : 's'} — you have ${balance}. Top up to enroll.`)
+      if (balance < cost) throw new Error(`This module costs ${cost} token${cost === 1 ? '' : 's'} — you have ${balance}. Top up to unlock.`)
       await db
         .prepare('INSERT INTO token_transactions (id, user_id, amount, type, description) VALUES (?, ?, ?, ?, ?)')
-        .bind(newId(), user.id, -cost, 'usage', `Enrolled in course ${data.courseId}`)
+        .bind(newId(), user.id, -cost, 'usage', `Unlocked module ${data.moduleId}`)
         .run()
     }
 
-    await db.prepare('INSERT OR IGNORE INTO enrollments (id, user_id, course_id) VALUES (?, ?, ?)').bind(newId(), user.id, data.courseId).run()
+    await db.prepare('INSERT OR IGNORE INTO module_unlocks (user_id, module_id) VALUES (?, ?)').bind(user.id, data.moduleId).run()
+  })
+
+export const getModuleTest = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { moduleId: string })
+  .handler(async ({ data }) => {
+    const db = getDB()
+    const test = await db.prepare('SELECT * FROM module_tests WHERE module_id = ?').bind(data.moduleId).first<Record<string, unknown>>()
+    if (!test) return null
+    return { ...test, questions: parseJSON(test.questions as string, []) }
+  })
+
+export const submitModuleTest = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { moduleId: string; score: number; passed: boolean })
+  .handler(async ({ data }) => {
+    const user = await requireAuth()
+    const db = getDB()
+    await db
+      .prepare('INSERT OR REPLACE INTO module_test_results (id, user_id, module_id, score, passed) VALUES (?, ?, ?, ?, ?)')
+      .bind(newId(), user.id, data.moduleId, data.score, data.passed ? 1 : 0)
+      .run()
+  })
+
+export const getModuleTestResult = createServerFn({ method: 'GET', strict: false })
+  .inputValidator((d: unknown) => d as { moduleId: string })
+  .handler(async ({ data }) => {
+    const sid = getCookie('vl_session')
+    const sessionUser = await getSession(sid)
+    if (!sessionUser) return null
+    const db = getDB()
+    const row = await db
+      .prepare('SELECT score, passed FROM module_test_results WHERE user_id = ? AND module_id = ?')
+      .bind(sessionUser.id, data.moduleId)
+      .first<{ score: number; passed: number }>()
+    return row ? { score: row.score, passed: !!row.passed } : null
   })
 
 // ── LESSON PROGRESS ─────────────────────────────────────────────────────────

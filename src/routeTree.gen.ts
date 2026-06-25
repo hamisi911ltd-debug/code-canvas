@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResearchRouteImport } from './routes/research'
+import { Route as LanguagesRouteImport } from './routes/languages'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as CommunityRouteImport } from './routes/community'
@@ -17,14 +18,21 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResearchIndexRouteImport } from './routes/research.index'
+import { Route as LanguagesIndexRouteImport } from './routes/languages.index'
 import { Route as CoursesIndexRouteImport } from './routes/courses.index'
 import { Route as ResearchSlugRouteImport } from './routes/research.$slug'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
 import { Route as LearnCourseSlugLessonIdRouteImport } from './routes/learn.$courseSlug.$lessonId'
+import { Route as LearnCourseSlugModuleModuleIdTestRouteImport } from './routes/learn.$courseSlug.module.$moduleId.test'
 
 const ResearchRoute = ResearchRouteImport.update({
   id: '/research',
   path: '/research',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LanguagesRoute = LanguagesRouteImport.update({
+  id: '/languages',
+  path: '/languages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -62,6 +70,11 @@ const ResearchIndexRoute = ResearchIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ResearchRoute,
 } as any)
+const LanguagesIndexRoute = LanguagesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LanguagesRoute,
+} as any)
 const CoursesIndexRoute = CoursesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -82,6 +95,12 @@ const LearnCourseSlugLessonIdRoute = LearnCourseSlugLessonIdRouteImport.update({
   path: '/learn/$courseSlug/$lessonId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LearnCourseSlugModuleModuleIdTestRoute =
+  LearnCourseSlugModuleModuleIdTestRouteImport.update({
+    id: '/learn/$courseSlug/module/$moduleId/test',
+    path: '/learn/$courseSlug/module/$moduleId/test',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -90,12 +109,15 @@ export interface FileRoutesByFullPath {
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/languages': typeof LanguagesRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/courses/': typeof CoursesIndexRoute
+  '/languages/': typeof LanguagesIndexRoute
   '/research/': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -106,8 +128,10 @@ export interface FileRoutesByTo {
   '/courses/$slug': typeof CoursesSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/courses': typeof CoursesIndexRoute
+  '/languages': typeof LanguagesIndexRoute
   '/research': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -117,12 +141,15 @@ export interface FileRoutesById {
   '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/languages': typeof LanguagesRouteWithChildren
   '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
   '/research/$slug': typeof ResearchSlugRoute
   '/courses/': typeof CoursesIndexRoute
+  '/languages/': typeof LanguagesIndexRoute
   '/research/': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
+  '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -133,12 +160,15 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/languages'
     | '/research'
     | '/courses/$slug'
     | '/research/$slug'
     | '/courses/'
+    | '/languages/'
     | '/research/'
     | '/learn/$courseSlug/$lessonId'
+    | '/learn/$courseSlug/module/$moduleId/test'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -149,8 +179,10 @@ export interface FileRouteTypes {
     | '/courses/$slug'
     | '/research/$slug'
     | '/courses'
+    | '/languages'
     | '/research'
     | '/learn/$courseSlug/$lessonId'
+    | '/learn/$courseSlug/module/$moduleId/test'
   id:
     | '__root__'
     | '/'
@@ -159,12 +191,15 @@ export interface FileRouteTypes {
     | '/community'
     | '/courses'
     | '/dashboard'
+    | '/languages'
     | '/research'
     | '/courses/$slug'
     | '/research/$slug'
     | '/courses/'
+    | '/languages/'
     | '/research/'
     | '/learn/$courseSlug/$lessonId'
+    | '/learn/$courseSlug/module/$moduleId/test'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -174,8 +209,10 @@ export interface RootRouteChildren {
   CommunityRoute: typeof CommunityRoute
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
+  LanguagesRoute: typeof LanguagesRouteWithChildren
   ResearchRoute: typeof ResearchRouteWithChildren
   LearnCourseSlugLessonIdRoute: typeof LearnCourseSlugLessonIdRoute
+  LearnCourseSlugModuleModuleIdTestRoute: typeof LearnCourseSlugModuleModuleIdTestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -185,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/research'
       fullPath: '/research'
       preLoaderRoute: typeof ResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/languages': {
+      id: '/languages'
+      path: '/languages'
+      fullPath: '/languages'
+      preLoaderRoute: typeof LanguagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -236,6 +280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResearchIndexRouteImport
       parentRoute: typeof ResearchRoute
     }
+    '/languages/': {
+      id: '/languages/'
+      path: '/'
+      fullPath: '/languages/'
+      preLoaderRoute: typeof LanguagesIndexRouteImport
+      parentRoute: typeof LanguagesRoute
+    }
     '/courses/': {
       id: '/courses/'
       path: '/'
@@ -264,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnCourseSlugLessonIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/learn/$courseSlug/module/$moduleId/test': {
+      id: '/learn/$courseSlug/module/$moduleId/test'
+      path: '/learn/$courseSlug/module/$moduleId/test'
+      fullPath: '/learn/$courseSlug/module/$moduleId/test'
+      preLoaderRoute: typeof LearnCourseSlugModuleModuleIdTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -279,6 +337,18 @@ const CoursesRouteChildren: CoursesRouteChildren = {
 
 const CoursesRouteWithChildren =
   CoursesRoute._addFileChildren(CoursesRouteChildren)
+
+interface LanguagesRouteChildren {
+  LanguagesIndexRoute: typeof LanguagesIndexRoute
+}
+
+const LanguagesRouteChildren: LanguagesRouteChildren = {
+  LanguagesIndexRoute: LanguagesIndexRoute,
+}
+
+const LanguagesRouteWithChildren = LanguagesRoute._addFileChildren(
+  LanguagesRouteChildren,
+)
 
 interface ResearchRouteChildren {
   ResearchSlugRoute: typeof ResearchSlugRoute
@@ -301,8 +371,11 @@ const rootRouteChildren: RootRouteChildren = {
   CommunityRoute: CommunityRoute,
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
+  LanguagesRoute: LanguagesRouteWithChildren,
   ResearchRoute: ResearchRouteWithChildren,
   LearnCourseSlugLessonIdRoute: LearnCourseSlugLessonIdRoute,
+  LearnCourseSlugModuleModuleIdTestRoute:
+    LearnCourseSlugModuleModuleIdTestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

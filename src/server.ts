@@ -3,46 +3,59 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { runWithCfEnv, type CfEnv } from "./lib/cf-context";
-import { getSession } from "./lib/auth";
-import { getIntaSendConfig } from "./lib/intasend";
+import { getDB, newId } from "./db/index";
+import { verifyIntaSendWebhook, parseApiRef } from "./lib/intasend";
 
 // TanStack Start's file-based router only recognizes routes that export `Route` —
 // `createAPIFileRoute`/`APIRoute` isn't wired up in this version, so API-only
 // endpoints are handled here instead, directly in the real Worker entry point,
 // before anything is handed to the TanStack handler.
-function readCookie(request: Request, name: string): string | undefined {
-  const header = request.headers.get("cookie") ?? "";
-  for (const part of header.split(";")) {
-    const [k, ...rest] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(rest.join("="));
+
+// IntaSend's Cloudflare zone rejects outbound requests from our Worker (Cloudflare
+// error 1106 — see lib/intasend.ts), so payments are confirmed via this inbound
+// webhook instead of the Worker polling IntaSend's status API.
+async function handleIntaSendWebhook(request: Request): Promise<Response> {
+  let payload: Record<string, unknown>;
+  try {
+    payload = await request.json();
+  } catch {
+    return new Response("Invalid JSON", { status: 400 });
   }
-  return undefined;
-}
 
-// TEMPORARY diagnostic (admin-only) — sends a deliberately invalid (amount=0) request
-// so IntaSend rejects it with a validation error before any charge/SMS could trigger.
-// Lets us see exactly what IntaSend's edge returns to this Worker's outbound IP.
-// Remove once the 403/"error code: 1106" issue is resolved.
-async function handleDiagnoseIntasend(request: Request): Promise<Response> {
-  const user = await getSession(readCookie(request, "vl_session"));
-  if (!user?.isAdmin) return new Response("Not found", { status: 404 });
+  if (!verifyIntaSendWebhook(payload)) return new Response("Invalid challenge", { status: 401 });
 
-  const { secretKey, baseUrl } = getIntaSendConfig();
-  const res = await fetch(`${baseUrl}/api/v1/payment/mpesa-stk-push/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": "VibeLearn/1.0 (+https://vlapp.glotech.workers.dev)",
-      Authorization: `Bearer ${secretKey}`,
-    },
-    body: JSON.stringify({ amount: 0, phone_number: "invalid", currency: "KES", api_ref: "diagnostic-test" }),
-  });
-  const text = await res.text();
-  return new Response(
-    JSON.stringify({ status: res.status, headers: Object.fromEntries(res.headers.entries()), body: text }),
-    { headers: { "Content-Type": "application/json" } },
-  );
+  const state = payload.state as string | undefined;
+  const invoiceId = payload.invoice_id as string | undefined;
+  const apiRef = payload.api_ref as string | undefined;
+  if (!invoiceId || !apiRef || (state !== "COMPLETE" && state !== "FAILED")) {
+    return new Response("OK", { status: 200 });
+  }
+
+  const parsed = parseApiRef(apiRef);
+  if (!parsed) return new Response("OK", { status: 200 });
+
+  const amount = Number(payload.value ?? payload.net_amount ?? 0);
+  const phoneNumber = (payload.account as string | undefined) ?? "";
+  const status = state === "COMPLETE" ? "complete" : "failed";
+
+  const db = getDB();
+  // INSERT OR IGNORE keyed on invoice_id's UNIQUE constraint makes this idempotent —
+  // IntaSend retries undelivered webhooks up to 20 times.
+  const inserted = await db
+    .prepare(
+      "INSERT OR IGNORE INTO mpesa_payments (id, user_id, invoice_id, api_ref, phone_number, tokens, amount_kes, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(newId(), parsed.userId, invoiceId, apiRef, phoneNumber, parsed.tokens, amount, status)
+    .run();
+
+  if (inserted.meta.changes > 0 && status === "complete") {
+    await db
+      .prepare("INSERT INTO token_transactions (id, user_id, amount, type, description) VALUES (?, ?, ?, ?, ?)")
+      .bind(newId(), parsed.userId, parsed.tokens, "purchase", `IntaSend M-Pesa · ${invoiceId}`)
+      .run();
+  }
+
+  return new Response("OK", { status: 200 });
 }
 
 type ServerEntry = {
@@ -112,9 +125,9 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     return runWithCfEnv(env as CfEnv, async () => {
       const url = new URL(request.url);
-      if (url.pathname === "/api/diagnose-intasend") {
+      if (url.pathname === "/api/intasend-webhook" && request.method === "POST") {
         try {
-          return await handleDiagnoseIntasend(request);
+          return await handleIntaSendWebhook(request);
         } catch (error) {
           console.error(error);
           return new Response(JSON.stringify({ error: String(error) }), { status: 500 });

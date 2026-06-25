@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, notFound } from '@tanstack/react-ro
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { getCourse, getEnrollment, getLessonProgress, enroll, getTokenBalance, getCourseExtras } from '@/server-functions/data'
+import { getCourse, getEnrollment, getLessonProgress, enroll, getTokenBalance, getCourseExtras, getModules, unlockModule } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BuyTokens } from '@/components/BuyTokens'
 import { CertificateBanner, FinalExam, LessonQuiz } from '@/components/ModuleExtras'
-import { CheckCircle2, Play, Clock, BookOpen, Lock, ArrowRight, FileText, Link2, ExternalLink, Award } from 'lucide-react'
+import { CheckCircle2, Play, Clock, BookOpen, Lock, ArrowRight, FileText, Link2, ExternalLink, Award, ChevronDown, Coins } from 'lucide-react'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/courses/$slug')({ component: CourseDetail })
@@ -30,7 +30,7 @@ function CourseDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const [showBuy, setShowBuy] = useState(false)
+  const [unlockingModuleId, setUnlockingModuleId] = useState<string | null>(null)
   const [justCertified, setJustCertified] = useState(false)
   const [justScore, setJustScore] = useState(0)
   const [certTime] = useState(new Date().toISOString())
@@ -73,13 +73,17 @@ function CourseDetail() {
     queryFn: () => getCourseExtras({ data: { courseId: course!.id as string, categoryId: (course as any).category_id ?? null } }),
   })
 
+  const { data: modules, refetch: refetchModules } = useQuery({
+    queryKey: ['modules', course?.id, user?.id],
+    enabled: !!course?.id,
+    queryFn: () => getModules({ data: { courseId: course!.id as string } }),
+  })
+
   const enrollMut = useMutation({
     mutationFn: () => enroll({ data: { courseId: course!.id as string } }),
     onSuccess: () => {
       toast.success("Enrolled! Let's go.")
-      setShowBuy(false)
       qc.invalidateQueries({ queryKey: ['enrollment'] })
-      qc.invalidateQueries({ queryKey: ['token-balance'] })
     },
     onError: (e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e)
@@ -88,17 +92,28 @@ function CourseDetail() {
     },
   })
 
+  const unlockModuleMut = useMutation({
+    mutationFn: (moduleId: string) => unlockModule({ data: { moduleId } }),
+    onSuccess: () => {
+      toast.success('Module unlocked!')
+      refetchModules()
+      refetchBalance()
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to unlock module'),
+  })
+
   if (isLoading) return <PageShell><div className="mx-auto max-w-5xl px-4 py-20"><div className="h-96 bg-muted/40 animate-pulse rounded-2xl" /></div></PageShell>
   if (!course) return null
 
   const lessons = ((course.lessons ?? []) as any[]).sort((a, b) => a.position - b.position)
   const done = completedIds ?? new Set<string>()
   const pct = lessons.length ? Math.round((done.size / lessons.length) * 100) : 0
-  const cost = (course as any).token_cost ?? 0
   const balance = tokenBalance ?? 0
-  const tokensNeeded = Math.max(0, cost - balance)
   const categoryId = (course as any).category_id as string | null
   const quizLessons = lessons.filter((l) => l.quiz)
+  const moduleList = modules ?? []
+  const unlockingModule = moduleList.find((m: any) => m.id === unlockingModuleId) ?? null
+  const tokensNeededForUnlock = unlockingModule ? Math.max(0, unlockingModule.token_cost - balance) : 0
   const hasCert = justCertified || !!extras?.certification
   const certScore = justCertified ? justScore : ((extras?.certification as any)?.score ?? 0)
   const certIssuedAt = justCertified ? certTime : ((extras?.certification as any)?.issued_at ?? certTime)
@@ -148,28 +163,34 @@ function CourseDetail() {
                   </Button>
                 </Link>
               )
-            ) : showBuy ? (
-              <div className="max-w-sm">
-                <BuyTokens
-                  tokens={tokensNeeded}
-                  onPurchased={() => { refetchBalance(); enrollMut.mutate() }}
-                />
-              </div>
             ) : (
               <Button
                 size="lg"
-                onClick={() => (tokensNeeded > 0 ? setShowBuy(true) : enrollMut.mutate())}
+                onClick={() => enrollMut.mutate()}
                 disabled={enrollMut.isPending}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 glow-ring"
               >
-                {cost > 0
-                  ? tokensNeeded > 0
-                    ? `Buy ${tokensNeeded} token${tokensNeeded === 1 ? '' : 's'} & enroll`
-                    : `Enroll for ${cost} token${cost === 1 ? '' : 's'}`
-                  : 'Enroll for free'}
+                Enroll for free
               </Button>
             )}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Enrolling is free — each module is unlocked individually as you go.
+          </p>
+          {unlockingModule && (
+            <BuyTokens
+              tokens={tokensNeededForUnlock}
+              courseTitle={`${(course as any).title} — ${unlockingModule.title}`}
+              open={!!unlockingModuleId}
+              onOpenChange={(open) => !open && setUnlockingModuleId(null)}
+              onPurchased={() => {
+                const id = unlockingModuleId
+                setUnlockingModuleId(null)
+                refetchBalance()
+                if (id) unlockModuleMut.mutate(id)
+              }}
+            />
+          )}
         </div>
       </section>
 
@@ -197,36 +218,72 @@ function CourseDetail() {
           <TabsContent value="content">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-xl sm:text-2xl font-bold">Course Content</h2>
-              <span className="text-xs text-muted-foreground">{lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-muted-foreground">{moduleList.length} module{moduleList.length !== 1 ? 's' : ''} · {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</span>
             </div>
-            {lessons.length === 0 ? (
-              <p className="text-muted-foreground">Lessons coming soon.</p>
+            {!enrollment ? (
+              <div className="text-center py-16 max-w-md mx-auto">
+                <Lock className="mx-auto h-12 w-12 text-muted-foreground/40" />
+                <h3 className="mt-4 font-display text-lg font-semibold">Enroll to see the modules</h3>
+                <p className="mt-2 text-sm text-muted-foreground">Enrolling is free. Each module unlocks individually once you're in.</p>
+              </div>
+            ) : moduleList.length === 0 ? (
+              <p className="text-muted-foreground">Modules coming soon.</p>
             ) : (
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
-                {lessons.map((l: any, i: number) => {
-                  const isDone = done.has(l.id)
-                  const accessible = !!enrollment
-                  const Inner = (
-                    <div className={`group flex items-center gap-3 rounded-xl border bg-card p-3 sm:p-4 transition ${accessible ? 'hover:border-primary/50 cursor-pointer' : 'opacity-60'} border-border`}>
-                      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${isDone ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                        {isDone ? <CheckCircle2 className="h-4 w-4" /> : accessible ? <Play className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] text-muted-foreground mb-0.5">Lesson {i + 1}</div>
-                        <div className="font-medium text-sm">{l.title}</div>
-                        {l.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{l.description}</div>}
-                        <div className="flex items-center gap-2 mt-1">
-                          {l.video_url && <span className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full"><Play className="h-2.5 w-2.5" />Video</span>}
-                          {l.content && <span className="inline-flex items-center gap-1 text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full"><FileText className="h-2.5 w-2.5" />Notes</span>}
-                          {l.duration_minutes ? <span className="text-[10px] text-muted-foreground">{l.duration_minutes}m</span> : null}
+              <div className="space-y-4">
+                {moduleList.map((m: any) => {
+                  const moduleLessons = lessons.filter((l: any) => l.module_id === m.id)
+                  const needed = Math.max(0, m.token_cost - balance)
+                  return (
+                    <div key={m.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+                      <div className="flex items-center justify-between gap-3 p-4 border-b border-border bg-muted/20">
+                        <div>
+                          <div className="font-display font-semibold flex items-center gap-2">
+                            {m.unlocked ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Lock className="h-4 w-4 text-muted-foreground" />}
+                            {m.title}
+                          </div>
+                          {m.description && <p className="text-xs text-muted-foreground mt-0.5">{m.description}</p>}
                         </div>
+                        {m.unlocked ? (
+                          <Badge variant="secondary" className="shrink-0">{moduleLessons.length} lesson{moduleLessons.length !== 1 ? 's' : ''}</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
+                            disabled={unlockModuleMut.isPending}
+                            onClick={() => (needed > 0 ? setUnlockingModuleId(m.id) : unlockModuleMut.mutate(m.id))}
+                          >
+                            <Coins className="h-3.5 w-3.5 mr-1.5" />
+                            {needed > 0 ? `Buy ${needed} token${needed === 1 ? '' : 's'} & unlock` : `Unlock for ${m.token_cost} token${m.token_cost === 1 ? '' : 's'}`}
+                          </Button>
+                        )}
                       </div>
+                      {m.unlocked && (
+                        <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 p-3">
+                          {moduleLessons.map((l: any, i: number) => {
+                            const isDone = done.has(l.id)
+                            return (
+                              <Link key={l.id} to="/learn/$courseSlug/$lessonId" params={{ courseSlug: (course as any).slug, lessonId: l.id }}>
+                                <div className="group flex items-center gap-3 rounded-xl border border-border p-3 hover:border-primary/50 cursor-pointer transition">
+                                  <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${isDone ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                    {isDone ? <CheckCircle2 className="h-4 w-4" /> : <Play className="h-3.5 w-3.5" />}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[10px] text-muted-foreground mb-0.5">Lesson {i + 1}</div>
+                                    <div className="font-medium text-sm">{l.title}</div>
+                                    {l.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{l.description}</div>}
+                                    <div className="flex items-center gap-2 mt-1">
+                                      {l.video_url && <span className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full"><Play className="h-2.5 w-2.5" />Video</span>}
+                                      {l.content && <span className="inline-flex items-center gap-1 text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full"><FileText className="h-2.5 w-2.5" />Notes</span>}
+                                      {l.duration_minutes ? <span className="text-[10px] text-muted-foreground">{l.duration_minutes}m</span> : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )
-                  return accessible ? (
-                    <Link key={l.id} to="/learn/$courseSlug/$lessonId" params={{ courseSlug: (course as any).slug, lessonId: l.id }}>{Inner}</Link>
-                  ) : (
-                    <div key={l.id}>{Inner}</div>
                   )
                 })}
               </div>

@@ -5,8 +5,7 @@ export type { D1Database }
 
 export interface CfEnv {
   DB: D1Database
-  INTASEND_SECRET_KEY: string
-  INTASEND_PUBLISHABLE_KEY: string
+  INTASEND_WEBHOOK_CHALLENGE: string
   ADMIN_EMAIL: string
   [key: string]: unknown
 }

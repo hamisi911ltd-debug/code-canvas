@@ -44,9 +44,20 @@ CREATE TABLE IF NOT EXISTS courses (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS modules (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  position INTEGER NOT NULL DEFAULT 1,
+  token_cost INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS lessons (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   course_id TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  module_id TEXT REFERENCES modules(id) ON DELETE SET NULL,
   title TEXT NOT NULL,
   description TEXT,
   video_url TEXT,
@@ -55,6 +66,32 @@ CREATE TABLE IF NOT EXISTS lessons (
   duration_minutes INTEGER NOT NULL DEFAULT 0,
   quiz TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS module_unlocks (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  unlocked_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, module_id)
+);
+
+CREATE TABLE IF NOT EXISTS module_tests (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  module_id TEXT NOT NULL UNIQUE REFERENCES modules(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  questions TEXT NOT NULL DEFAULT '[]',
+  pass_score INTEGER NOT NULL DEFAULT 70,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS module_test_results (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  module_id TEXT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  score INTEGER,
+  passed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, module_id)
 );
 
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -149,6 +186,7 @@ CREATE TABLE IF NOT EXISTS mpesa_payments (
   id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   invoice_id TEXT UNIQUE NOT NULL,
+  api_ref TEXT UNIQUE,
   phone_number TEXT NOT NULL,
   tokens INTEGER NOT NULL DEFAULT 1,
   amount_kes REAL NOT NULL,
@@ -167,6 +205,9 @@ CREATE TABLE IF NOT EXISTS community_posts (
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id, position);
+CREATE INDEX IF NOT EXISTS idx_lessons_module ON lessons(module_id, position);
+CREATE INDEX IF NOT EXISTS idx_modules_course ON modules(course_id, position);
+CREATE INDEX IF NOT EXISTS idx_module_unlocks_user ON module_unlocks(user_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_user ON enrollments(user_id);
 CREATE INDEX IF NOT EXISTS idx_progress_user ON lesson_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_token_tx_user ON token_transactions(user_id);

@@ -6,10 +6,11 @@ import {
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Menu, LogOut, LayoutDashboard, Shield, BookOpen, FlaskConical, Users } from "lucide-react";
+import { Menu, LogOut, LayoutDashboard, Shield, BookOpen, FlaskConical, Users, Languages } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navLinks = [
+  { to: "/languages", label: "Languages", icon: Languages },
   { to: "/courses", label: "Courses", icon: BookOpen },
   { to: "/research", label: "Research", icon: FlaskConical },
   { to: "/community", label: "Community", icon: Users },
