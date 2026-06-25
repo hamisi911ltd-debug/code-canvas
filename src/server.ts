@@ -22,7 +22,9 @@ async function handleIntaSendWebhook(request: Request): Promise<Response> {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  if (!verifyIntaSendWebhook(payload)) return new Response("Invalid challenge", { status: 401 });
+  if (payload.challenge !== undefined && !verifyIntaSendWebhook(payload)) {
+    return new Response("Invalid challenge", { status: 401 });
+  }
 
   const state = payload.state as string | undefined;
   const invoiceId = payload.invoice_id as string | undefined;

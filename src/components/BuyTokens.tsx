@@ -37,6 +37,7 @@ export function BuyTokens({
   const { user } = useAuth()
   const [step, setStep] = useState<'summary' | 'checkout'>('summary')
   const [checkoutLoaded, setCheckoutLoaded] = useState(false)
+  const [sdkReady, setSdkReady] = useState(false)
   const [apiRef, setApiRef] = useState<string | null>(null)
   const intaSendRef = useRef<IntaSend | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -67,34 +68,63 @@ export function BuyTokens({
 
   useEffect(() => {
     let cancelled = false
-    import('intasend-inlinejs-sdk').then(({ default: IntaSend }) => {
-      if (cancelled) return
-      const publicAPIKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY as string | undefined
-      intaSendRef.current = new IntaSend({
-        publicAPIKey,
-        live: publicAPIKey?.includes('_live_') ?? false,
-        mode: 'inline',
-        inlineContainer: CHECKOUT_CONTAINER_ID,
-        // The SDK's own `styles` constructor option is a documented no-op for this
-        // account — IntaSend's server returns a fixed style payload with the checkout
-        // session regardless of what's passed here (confirmed by inspecting the
-        // checkout iframe's URL payload). The card's own colors are only themeable
-        // from the IntaSend dashboard (Sales → Manage → checkout layout/presets).
-      }).on('FAILED', () => {
-        setStep('summary')
-        toast.error("Payment didn't go through. You haven't been charged.")
+    import('intasend-inlinejs-sdk')
+      .then(({ default: IntaSend }) => {
+        if (cancelled) return
+        const publicAPIKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY as string | undefined
+        if (!publicAPIKey) {
+          toast.error('Missing IntaSend publishable key. Check your env configuration.')
+          return
+        }
+        intaSendRef.current = new IntaSend({
+          publicAPIKey,
+          live: publicAPIKey.includes('_live_'),
+          mode: 'inline',
+          inlineContainer: CHECKOUT_CONTAINER_ID,
+          // The SDK's own `styles` constructor option is a documented no-op for this
+          // account — IntaSend's server returns a fixed style payload with the checkout
+          // session regardless of what's passed here (confirmed by inspecting the
+          // checkout iframe's URL payload). The card's own colors are only themeable
+          // from the IntaSend dashboard (Sales → Manage → checkout layout/presets).
+        })
+          .on('FAILED', () => {
+            setStep('summary')
+            toast.error("Payment didn't go through. You haven't been charged.")
+          })
+          .on('COMPLETE', () => {
+            setCheckoutLoaded(true)
+          })
+          .on('IN-PROGRESS', () => {
+            setCheckoutLoaded(false)
+          })
+        setSdkReady(true)
       })
-    })
+      .catch((error) => {
+        console.error('Failed to load IntaSend SDK', error)
+        toast.error('Unable to load payment checkout. Please refresh and try again.')
+      })
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!open) {
+      setStep('summary')
+      setCheckoutLoaded(false)
+      setApiRef(null)
+      intaSendRef.current = null
+    }
+  }, [open])
+
   const amount = tokens * KES_PER_TOKEN
 
   const handlePayNow = () => {
-    if (!user || !intaSendRef.current) return
+    if (!user || !sdkReady || !intaSendRef.current) {
+      toast.error('Payment checkout is not ready. Please try again in a moment.')
+      return
+    }
     setStep('checkout')
 
     const ref = `tokens-${tokens}-${user.id}-${Date.now().toString(36)}`
@@ -158,8 +188,13 @@ export function BuyTokens({
         </div>
 
         {step === 'summary' ? (
-          <Button onClick={handlePayNow} size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-            Pay KES {amount}
+          <Button
+            onClick={handlePayNow}
+            size="lg"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={!sdkReady}
+          >
+            {sdkReady ? `Pay KES ${amount}` : 'Loading payment checkout…'}
           </Button>
         ) : (
           <div

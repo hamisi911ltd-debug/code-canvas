@@ -24,7 +24,8 @@ function NoteRenderer({ content }: { content: string }) {
   const lines = content.split('\n')
   const rendered: ReactNode[] = []
   let ulBuffer: string[] = []
-  let olBuffer: string[] = []
+  let olBuffer: { n: number; t: string }[] = []
+  let olStart = 1
   let key = 0
 
   const inlineFormat = (text: string): ReactNode => {
@@ -68,11 +69,12 @@ function NoteRenderer({ content }: { content: string }) {
     if (olBuffer.length) {
       const items = [...olBuffer]
       rendered.push(
-        <ol key={`ol-${key++}`} className="list-decimal list-inside space-y-1 my-2 text-sm text-foreground/90">
-          {items.map((item, i) => <li key={i}>{inlineFormat(item)}</li>)}
+        <ol key={`ol-${key++}`} start={olStart} className="list-decimal list-inside space-y-1 my-2 text-sm text-foreground/90">
+          {items.map((item, i) => <li key={i}>{inlineFormat(item.t)}</li>)}
         </ol>,
       )
       olBuffer = []
+      olStart = 1
     }
   }
   const flushLists = () => { flushUl(); flushOl() }
@@ -104,7 +106,7 @@ function NoteRenderer({ content }: { content: string }) {
     else if (line.startsWith('## ')) { flushLists(); rendered.push(<h2 key={i} className="text-lg font-bold mt-6 mb-2 text-foreground border-b border-border pb-1">{line.slice(3)}</h2>) }
     else if (line.startsWith('# ')) { flushLists(); rendered.push(<h1 key={i} className="text-xl font-bold mt-6 mb-2 text-foreground">{line.slice(2)}</h1>) }
     else if (line.startsWith('- ') || line.startsWith('* ')) { flushOl(); ulBuffer.push(line.slice(2)) }
-    else if (/^\d+\.\s/.test(line)) { flushUl(); olBuffer.push(line.replace(/^\d+\.\s/, '')) }
+    else if (/^(\d+)\.\s/.test(line)) { flushUl(); const m = line.match(/^(\d+)\.\s+(.*)$/)!; const n = Number(m[1]); const txt = m[2]; if (!olBuffer.length) olStart = n; olBuffer.push({ n, t: txt }) }
     else if (line.startsWith('> ')) { flushLists(); rendered.push(<blockquote key={i} className="border-l-4 border-primary/50 pl-4 my-2 text-sm text-muted-foreground italic">{inlineFormat(line.slice(2))}</blockquote>) }
     else if (line.trim() === '') { flushLists(); rendered.push(<div key={i} className="h-2" />) }
     else { flushLists(); rendered.push(<p key={i} className="text-sm leading-relaxed text-foreground/90 my-1">{inlineFormat(line)}</p>) }
