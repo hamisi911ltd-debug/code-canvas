@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS lessons (
   position INTEGER NOT NULL DEFAULT 1,
   duration_minutes INTEGER NOT NULL DEFAULT 0,
   quiz TEXT,
+  ai_image_url TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -80,7 +81,7 @@ CREATE TABLE IF NOT EXISTS module_tests (
   module_id TEXT NOT NULL UNIQUE REFERENCES modules(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   questions TEXT NOT NULL DEFAULT '[]',
-  pass_score INTEGER NOT NULL DEFAULT 70,
+  pass_score INTEGER NOT NULL DEFAULT 80,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -138,7 +139,7 @@ CREATE TABLE IF NOT EXISTS module_exams (
   category_id TEXT NOT NULL REFERENCES categories(id),
   title TEXT NOT NULL,
   questions TEXT NOT NULL DEFAULT '[]',
-  pass_score INTEGER NOT NULL DEFAULT 70,
+  pass_score INTEGER NOT NULL DEFAULT 80,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -149,6 +150,14 @@ CREATE TABLE IF NOT EXISTS certifications (
   score INTEGER,
   issued_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(user_id, category_id)
+);
+
+-- Platform-wide certificate, issued once a learner completes all 6 published courses.
+CREATE TABLE IF NOT EXISTS platform_certificates (
+  id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  courses_completed INTEGER NOT NULL,
+  issued_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS quiz_results (

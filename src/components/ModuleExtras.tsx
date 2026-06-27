@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { submitQuiz, submitExam } from '@/server-functions/data'
+import { fireConfetti, fireBigConfetti } from '@/components/Celebration'
 import { Award, BookOpen, CheckCircle2, ChevronDown, ChevronUp, XCircle } from 'lucide-react'
 
 type QuizQuestion = { q: string; options: string[]; answer: number }
@@ -53,12 +54,12 @@ export function LessonQuiz({
   const handleSubmit = () => {
     const correct = answers.filter((a, i) => a === questions[i].answer).length
     const score = questions.length ? Math.round((correct / questions.length) * 100) : 0
-    const passed = score >= 70
+    const passed = score >= 80
     setResult({ score, passed })
     setSubmitted(true)
     saveMutation.mutate({ score, passed })
-    if (passed) toast.success(`Quiz passed! ${score}%`)
-    else toast.error(`${score}% — need 70% to pass. Try again!`)
+    if (passed) { fireConfetti(); toast.success(`Quiz passed! ${score}%`) }
+    else toast.error(`${score}% — need 80% to pass. Try again!`)
   }
 
   return (
@@ -147,10 +148,10 @@ export function FinalExam({ exam, categoryId, onCertified, onSaved }: { exam: an
   const handleSubmit = () => {
     const correct = answers.filter((a, i) => a === questions[i].answer).length
     const score = Math.round((correct / questions.length) * 100)
-    const passed = score >= (exam.pass_score ?? 70)
+    const passed = score >= (exam.pass_score ?? 80)
     setResult({ score, passed })
     saveMutation.mutate(score)
-    if (passed) onCertified(score)
+    if (passed) { fireBigConfetti(); onCertified(score) }
   }
 
   return (
@@ -161,7 +162,7 @@ export function FinalExam({ exam, categoryId, onCertified, onSaved }: { exam: an
           <h3 className="font-display text-lg font-bold">{exam.title}</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          {questions.length} questions · Pass score: {exam.pass_score ?? 70}%
+          {questions.length} questions · Pass score: {exam.pass_score ?? 80}%
         </p>
       </div>
 

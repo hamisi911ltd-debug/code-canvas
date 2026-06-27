@@ -14,9 +14,8 @@ export function SiteFooter() {
           </Link>
 
           <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
+            <Link to="/languages" className="hover:text-foreground transition">Languages</Link>
             <Link to="/courses" className="hover:text-foreground transition">Courses</Link>
-            <Link to="/research" className="hover:text-foreground transition">Research</Link>
-            <Link to="/community" className="hover:text-foreground transition">Community</Link>
             <Link to="/auth" className="hover:text-foreground transition">Sign in</Link>
           </div>
 

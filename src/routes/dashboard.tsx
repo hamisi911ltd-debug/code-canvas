@@ -5,8 +5,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { getDashboard } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Progress } from '@/components/ui/progress'
+import { fireBigConfetti } from '@/components/Celebration'
 import {
-  BookOpen, CheckCircle2, PlayCircle, Award, Coins, ArrowRight, Play,
+  BookOpen, CheckCircle2, PlayCircle, Award, Coins, ArrowRight, Play, GraduationCap,
 } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard')({ component: Dashboard })
@@ -25,17 +26,27 @@ function Dashboard() {
   const rows = data?.courses ?? []
   const tokenBalance = data?.tokenBalance ?? 0
   const certificates = data?.certificates ?? 0
+  const coursesForPlatformCert = data?.coursesForPlatformCert ?? 6
+  const platformCertificate = data?.platformCertificate
 
   const completedCourses = rows.filter((r) => r.pct === 100).length
   const inProgressCourses = rows.filter((r) => r.pct > 0 && r.pct < 100).length
 
   const continueCourse = rows.find((r) => r.pct > 0 && r.pct < 100) ?? rows[0]
 
+  useEffect(() => {
+    if (!platformCertificate) return
+    const seenKey = `vl_platform_cert_seen_${(platformCertificate as any).user_id}`
+    if (localStorage.getItem(seenKey)) return
+    localStorage.setItem(seenKey, '1')
+    fireBigConfetti()
+  }, [platformCertificate])
+
   const stats = [
     { icon: PlayCircle, label: 'In Progress', value: inProgressCourses, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    { icon: CheckCircle2, label: 'Completed', value: completedCourses, color: 'text-primary', bg: 'bg-primary/10' },
+    { icon: CheckCircle2, label: 'Completed', value: `${completedCourses}/${coursesForPlatformCert}`, color: 'text-primary', bg: 'bg-primary/10' },
     { icon: Coins, label: 'Tokens', value: tokenBalance, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    { icon: Award, label: 'Certificates', value: certificates, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    { icon: Award, label: 'Certificates', value: certificates + (platformCertificate ? 1 : 0), color: 'text-purple-400', bg: 'bg-purple-500/10' },
   ]
 
   return (
@@ -95,6 +106,30 @@ function Dashboard() {
             </div>
           ))}
         </div>
+
+        {/* Platform graduation certificate */}
+        {platformCertificate ? (
+          <div className="relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-accent/5 p-5 sm:p-7 text-center glow-ring animate-in fade-in-0 zoom-in-95 duration-500">
+            <div className="absolute inset-0 grid-pattern opacity-20" />
+            <div className="relative">
+              <GraduationCap className="mx-auto h-12 w-12 text-primary mb-3" />
+              <p className="text-xs text-primary uppercase tracking-wider font-semibold">VibeLearn Certified Graduate</p>
+              <h3 className="font-display text-xl sm:text-2xl font-bold mt-1.5">You completed all {coursesForPlatformCert} courses! 🎉</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Issued {new Date((platformCertificate as any).issued_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
+        ) : completedCourses > 0 ? (
+          <div className="rounded-2xl border border-dashed border-primary/30 bg-card/50 p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-sm font-medium flex items-center gap-2"><GraduationCap className="h-4 w-4 text-primary" /> Graduation progress</span>
+              <span className="text-xs text-muted-foreground shrink-0">{completedCourses}/{coursesForPlatformCert} courses</span>
+            </div>
+            <Progress value={(completedCourses / coursesForPlatformCert) * 100} className="h-1.5" />
+            <p className="mt-2 text-xs text-muted-foreground">Complete all {coursesForPlatformCert} courses to earn your VibeLearn certificate.</p>
+          </div>
+        ) : null}
 
         {/* My courses */}
         {rows.length > 0 ? (

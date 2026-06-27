@@ -4,6 +4,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
 import { getDB, newId } from '@/db/index'
 import { getSession, type SessionUser } from '@/lib/auth'
+import { getCfEnv } from '@/lib/cf-context'
 
 function parseJSON<T>(s: string | null | undefined, fallback: T): T {
   try {
@@ -28,7 +29,7 @@ async function requireAdmin(): Promise<SessionUser> {
 
 // ── CATEGORIES ──────────────────────────────────────────────────────────────
 
-export const getCategories = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getCategories = createServerFn({ method: 'GET' }).handler(async () => {
   const db = getDB()
   const { results } = await db.prepare('SELECT * FROM categories ORDER BY name').all()
   return (results ?? []) as Array<{ id: string; name: string; slug: string; description: string | null; icon: string | null }>
@@ -36,7 +37,7 @@ export const getCategories = createServerFn({ method: 'GET', strict: false }).ha
 
 // ── COURSES ─────────────────────────────────────────────────────────────────
 
-export const getCourses = createServerFn({ method: 'GET', strict: false })
+export const getCourses = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { categorySlug?: string })
   .handler(async ({ data }) => {
     const db = getDB()
@@ -57,7 +58,7 @@ export const getCourses = createServerFn({ method: 'GET', strict: false })
     }))
   })
 
-export const getCourse = createServerFn({ method: 'GET', strict: false })
+export const getCourse = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { slug: string })
   .handler(async ({ data }) => {
     const db = getDB()
@@ -85,7 +86,7 @@ export const getCourse = createServerFn({ method: 'GET', strict: false })
 
 // Resources, final exam, and certification for a course's module (category) — shown
 // alongside the course's own lessons now that this content no longer lives in a separate Library.
-export const getCourseExtras = createServerFn({ method: 'GET', strict: false })
+export const getCourseExtras = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { courseId: string; categoryId: string | null })
   .handler(async ({ data }) => {
     const db = getDB()
@@ -128,7 +129,7 @@ export const getCourseExtras = createServerFn({ method: 'GET', strict: false })
     }
   })
 
-export const getAllCoursesAdmin = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getAllCoursesAdmin = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
   const db = getDB()
   const { results } = await db
@@ -194,7 +195,7 @@ export const deleteCourse = createServerFn({ method: 'POST' })
 
 // ── LESSONS ─────────────────────────────────────────────────────────────────
 
-export const getLessons = createServerFn({ method: 'GET', strict: false })
+export const getLessons = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { courseId: string })
   .handler(async ({ data }) => {
     const db = getDB()
@@ -211,6 +212,7 @@ export const upsertLesson = createServerFn({ method: 'POST' })
       d as {
         id?: string
         course_id: string
+        module_id?: string | null
         title: string
         description: string
         video_url: string
@@ -224,14 +226,14 @@ export const upsertLesson = createServerFn({ method: 'POST' })
     const db = getDB()
     if (data.id) {
       await db
-        .prepare(`UPDATE lessons SET title=?,description=?,video_url=?,content=?,position=?,duration_minutes=? WHERE id=?`)
-        .bind(data.title, data.description || null, data.video_url || null, data.content || null, data.position, data.duration_minutes, data.id)
+        .prepare(`UPDATE lessons SET title=?,description=?,video_url=?,content=?,position=?,duration_minutes=?,module_id=? WHERE id=?`)
+        .bind(data.title, data.description || null, data.video_url || null, data.content || null, data.position, data.duration_minutes, data.module_id || null, data.id)
         .run()
     } else {
       const id = newId()
       await db
-        .prepare(`INSERT INTO lessons (id,course_id,title,description,video_url,content,position,duration_minutes) VALUES (?,?,?,?,?,?,?,?)`)
-        .bind(id, data.course_id, data.title, data.description || null, data.video_url || null, data.content || null, data.position, data.duration_minutes)
+        .prepare(`INSERT INTO lessons (id,course_id,module_id,title,description,video_url,content,position,duration_minutes) VALUES (?,?,?,?,?,?,?,?,?)`)
+        .bind(id, data.course_id, data.module_id || null, data.title, data.description || null, data.video_url || null, data.content || null, data.position, data.duration_minutes)
         .run()
     }
   })
@@ -244,9 +246,38 @@ export const deleteLesson = createServerFn({ method: 'POST' })
     await db.prepare('DELETE FROM lessons WHERE id = ?').bind(data.id).run()
   })
 
+// Generates a small illustrative cover image for a lesson via Cloudflare Workers AI
+// (text-to-image) and caches it as a data URL on the lesson row. Requires the `AI`
+// binding (see wrangler.jsonc) — only available once deployed/run against a real
+// Cloudflare account, since there's no local emulation for Workers AI.
+export const generateLessonImage = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { lessonId: string })
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const db = getDB()
+    const env = getCfEnv()
+    if (!env.AI) throw new Error('Workers AI binding not configured for this environment.')
+
+    const lesson = await db
+      .prepare('SELECT title, description FROM lessons WHERE id = ?')
+      .bind(data.lessonId)
+      .first<{ title: string; description: string | null }>()
+    if (!lesson) throw new Error('Lesson not found')
+
+    const topic = [lesson.title, lesson.description].filter(Boolean).join(' — ')
+    const prompt = `Flat vector illustration for an online coding course lesson about "${topic}". Clean modern tech style, teal (#2dd4a8) and dark navy color palette, simple geometric shapes, no text, no words, no letters, no UI mockups.`
+
+    const result = await env.AI.run('@cf/black-forest-labs/flux-1-schnell', { prompt, steps: 6 } as never)
+    const base64 = (result as unknown as { image: string }).image
+    const dataUrl = `data:image/jpeg;base64,${base64}`
+
+    await db.prepare('UPDATE lessons SET ai_image_url = ? WHERE id = ?').bind(dataUrl, data.lessonId).run()
+    return { ai_image_url: dataUrl }
+  })
+
 // ── ENROLLMENTS ─────────────────────────────────────────────────────────────
 
-export const getEnrollment = createServerFn({ method: 'GET', strict: false })
+export const getEnrollment = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { courseId: string })
   .handler(async ({ data }) => {
     const user = await requireAuth()
@@ -265,7 +296,7 @@ export const enroll = createServerFn({ method: 'POST' })
 
 // ── MODULES ──────────────────────────────────────────────────────────────────
 
-export const getModules = createServerFn({ method: 'GET', strict: false })
+export const getModules = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { courseId: string })
   .handler(async ({ data }) => {
     const sid = getCookie('vl_session')
@@ -283,6 +314,52 @@ export const getModules = createServerFn({ method: 'GET', strict: false })
     return (results ?? []).map((m) => ({ ...m, unlocked: !!m.unlocked }))
   })
 
+export const upsertModule = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: unknown) =>
+      d as { id?: string; course_id: string; title: string; description: string; position: number; token_cost: number },
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const db = getDB()
+    if (data.id) {
+      await db
+        .prepare('UPDATE modules SET title=?,description=?,position=?,token_cost=? WHERE id=?')
+        .bind(data.title, data.description || null, data.position, data.token_cost, data.id)
+        .run()
+    } else {
+      await db
+        .prepare('INSERT INTO modules (id,course_id,title,description,position,token_cost) VALUES (?,?,?,?,?,?)')
+        .bind(newId(), data.course_id, data.title, data.description || null, data.position, data.token_cost)
+        .run()
+    }
+  })
+
+export const deleteModule = createServerFn({ method: 'POST' })
+  .inputValidator((d: unknown) => d as { id: string })
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const db = getDB()
+    await db.prepare('DELETE FROM modules WHERE id = ?').bind(data.id).run()
+  })
+
+// Learners can only unlock one new module per hour (across the whole platform) —
+// already-unlocked modules stay freely accessible. Keeps pacing deliberate instead
+// of letting someone token-dump through every module in one sitting.
+const MODULE_UNLOCK_COOLDOWN_MS = 60 * 60 * 1000
+
+export const getModuleUnlockCooldown = createServerFn({ method: 'GET' }).handler(async () => {
+  const user = await requireAuth()
+  const db = getDB()
+  const last = await db
+    .prepare('SELECT unlocked_at FROM module_unlocks WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 1')
+    .bind(user.id)
+    .first<{ unlocked_at: string }>()
+  if (!last) return { remainingMs: 0 }
+  const elapsed = Date.now() - new Date(last.unlocked_at.replace(' ', 'T') + 'Z').getTime()
+  return { remainingMs: Math.max(0, MODULE_UNLOCK_COOLDOWN_MS - elapsed) }
+})
+
 export const unlockModule = createServerFn({ method: 'POST' })
   .inputValidator((d: unknown) => d as { moduleId: string })
   .handler(async ({ data }) => {
@@ -291,6 +368,18 @@ export const unlockModule = createServerFn({ method: 'POST' })
 
     const existing = await db.prepare('SELECT 1 FROM module_unlocks WHERE user_id = ? AND module_id = ?').bind(user.id, data.moduleId).first()
     if (existing) return
+
+    const last = await db
+      .prepare('SELECT unlocked_at FROM module_unlocks WHERE user_id = ? ORDER BY unlocked_at DESC LIMIT 1')
+      .bind(user.id)
+      .first<{ unlocked_at: string }>()
+    if (last) {
+      const elapsed = Date.now() - new Date(last.unlocked_at.replace(' ', 'T') + 'Z').getTime()
+      if (elapsed < MODULE_UNLOCK_COOLDOWN_MS) {
+        const minutesLeft = Math.ceil((MODULE_UNLOCK_COOLDOWN_MS - elapsed) / 60000)
+        throw new Error(`You can only unlock one module per hour — try again in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`)
+      }
+    }
 
     const module_ = await db.prepare('SELECT token_cost FROM modules WHERE id = ?').bind(data.moduleId).first<{ token_cost: number }>()
     if (!module_) throw new Error('Module not found')
@@ -309,13 +398,43 @@ export const unlockModule = createServerFn({ method: 'POST' })
     await db.prepare('INSERT OR IGNORE INTO module_unlocks (user_id, module_id) VALUES (?, ?)').bind(user.id, data.moduleId).run()
   })
 
-export const getModuleTest = createServerFn({ method: 'GET', strict: false })
+export const getModuleTest = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { moduleId: string })
   .handler(async ({ data }) => {
     const db = getDB()
     const test = await db.prepare('SELECT * FROM module_tests WHERE module_id = ?').bind(data.moduleId).first<Record<string, unknown>>()
     if (!test) return null
     return { ...test, questions: parseJSON(test.questions as string, []) }
+  })
+
+export const getAdminModuleTest = createServerFn({ method: 'GET' })
+  .inputValidator((d: unknown) => d as { moduleId: string })
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const db = getDB()
+    const test = await db.prepare('SELECT * FROM module_tests WHERE module_id = ?').bind(data.moduleId).first<Record<string, unknown>>()
+    return test ? { ...test, questions: parseJSON(test.questions as string, []) } : null
+  })
+
+export const upsertModuleTest = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: unknown) => d as { id?: string; moduleId: string; title: string; questions: unknown[]; passScore: number },
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const db = getDB()
+    const questionsJson = JSON.stringify(data.questions)
+    if (data.id) {
+      await db
+        .prepare('UPDATE module_tests SET title=?,questions=?,pass_score=? WHERE id=?')
+        .bind(data.title, questionsJson, data.passScore, data.id)
+        .run()
+    } else {
+      await db
+        .prepare('INSERT INTO module_tests (id,module_id,title,questions,pass_score) VALUES (?,?,?,?,?)')
+        .bind(newId(), data.moduleId, data.title, questionsJson, data.passScore)
+        .run()
+    }
   })
 
 export const submitModuleTest = createServerFn({ method: 'POST' })
@@ -329,7 +448,7 @@ export const submitModuleTest = createServerFn({ method: 'POST' })
       .run()
   })
 
-export const getModuleTestResult = createServerFn({ method: 'GET', strict: false })
+export const getModuleTestResult = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { moduleId: string })
   .handler(async ({ data }) => {
     const sid = getCookie('vl_session')
@@ -345,7 +464,7 @@ export const getModuleTestResult = createServerFn({ method: 'GET', strict: false
 
 // ── LESSON PROGRESS ─────────────────────────────────────────────────────────
 
-export const getLessonProgress = createServerFn({ method: 'GET', strict: false })
+export const getLessonProgress = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { lessonIds: string[] })
   .handler(async ({ data }) => {
     const user = await requireAuth()
@@ -369,7 +488,7 @@ export const markLessonComplete = createServerFn({ method: 'POST' })
 
 // ── DASHBOARD ────────────────────────────────────────────────────────────────
 
-export const getDashboard = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getDashboard = createServerFn({ method: 'GET' }).handler(async () => {
   const user = await requireAuth()
   const db = getDB()
   const [enrollRes, tokenRow, certRow] = await Promise.all([
@@ -395,16 +514,40 @@ export const getDashboard = createServerFn({ method: 'GET', strict: false }).han
     pct: e.total_lessons ? Math.round((Number(e.completed_lessons) / Number(e.total_lessons)) * 100) : 0,
   }))
 
+  // Platform-wide graduation certificate — awarded once, the first time a
+  // learner has fully completed 6 distinct courses (matches the platform's
+  // current 6-course curriculum). Checked on every dashboard load so it's
+  // issued automatically the moment the 6th course is finished.
+  const COURSES_FOR_PLATFORM_CERT = 6
+  const completedCourseCount = courses.filter((c) => c.pct === 100).length
+  let platformCertificate = await db
+    .prepare('SELECT * FROM platform_certificates WHERE user_id = ?')
+    .bind(user.id)
+    .first<Record<string, unknown>>()
+  if (!platformCertificate && completedCourseCount >= COURSES_FOR_PLATFORM_CERT) {
+    await db
+      .prepare('INSERT OR IGNORE INTO platform_certificates (id, user_id, courses_completed) VALUES (?, ?, ?)')
+      .bind(newId(), user.id, completedCourseCount)
+      .run()
+    platformCertificate = await db
+      .prepare('SELECT * FROM platform_certificates WHERE user_id = ?')
+      .bind(user.id)
+      .first<Record<string, unknown>>()
+  }
+
   return {
     courses,
     tokenBalance: tokenRow?.balance ?? 0,
     certificates: certRow?.count ?? 0,
+    completedCourseCount,
+    coursesForPlatformCert: COURSES_FOR_PLATFORM_CERT,
+    platformCertificate,
   }
 })
 
 // ── TOKENS ───────────────────────────────────────────────────────────────────
 
-export const getTokenBalance = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getTokenBalance = createServerFn({ method: 'GET' }).handler(async () => {
   const user = await requireAuth()
   const db = getDB()
   const row = await db
@@ -415,62 +558,15 @@ export const getTokenBalance = createServerFn({ method: 'GET', strict: false }).
 })
 
 
-export const getTokenPackages = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getTokenPackages = createServerFn({ method: 'GET' }).handler(async () => {
   const db = getDB()
   const { results } = await db.prepare('SELECT * FROM token_packages WHERE active = 1 ORDER BY price_kes').all<Record<string, unknown>>()
   return (results ?? []).map((p) => ({ ...p, active: !!p.active }))
 })
 
-// ── RESEARCH ─────────────────────────────────────────────────────────────────
-
-export const getResearchArticles = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  const db = getDB()
-  const { results } = await db
-    .prepare('SELECT * FROM research_articles WHERE published = 1 ORDER BY created_at DESC')
-    .all<Record<string, unknown>>()
-  return (results ?? []).map((a) => ({ ...a, published: !!a.published, tags: parseJSON(a.tags as string, []) }))
-})
-
-export const getResearchArticle = createServerFn({ method: 'GET', strict: false })
-  .inputValidator((d: unknown) => d as { slug: string })
-  .handler(async ({ data }) => {
-    const db = getDB()
-    const a = await db
-      .prepare('SELECT * FROM research_articles WHERE slug = ? AND published = 1')
-      .bind(data.slug)
-      .first<Record<string, unknown>>()
-    return a ? { ...a, published: !!a.published, tags: parseJSON(a.tags as string, []) } : null
-  })
-
-// ── COMMUNITY ────────────────────────────────────────────────────────────────
-
-export const getCommunityPosts = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  const db = getDB()
-  const { results } = await db
-    .prepare(
-      `SELECT p.*, u.display_name FROM community_posts p
-       JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC LIMIT 50`,
-    )
-    .all<Record<string, unknown>>()
-  return (results ?? []).map((p) => ({ ...p, profiles: { display_name: p.display_name } }))
-})
-
-export const createPost = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) => d as { title: string; content: string })
-  .handler(async ({ data }) => {
-    const user = await requireAuth()
-    if ((data.title?.trim()?.length ?? 0) < 3) throw new Error('Title must be at least 3 characters.')
-    if ((data.content?.trim()?.length ?? 0) < 5) throw new Error('Content must be at least 5 characters.')
-    const db = getDB()
-    await db
-      .prepare('INSERT INTO community_posts (id, user_id, title, content) VALUES (?, ?, ?, ?)')
-      .bind(newId(), user.id, data.title.trim(), data.content.trim())
-      .run()
-  })
-
 // ── ADMIN ────────────────────────────────────────────────────────────────────
 
-export const getAdminStats = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getAdminStats = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
   const db = getDB()
   const [students, courses, enrollments, completions] = await Promise.all([
@@ -487,7 +583,7 @@ export const getAdminStats = createServerFn({ method: 'GET', strict: false }).ha
   }
 })
 
-export const getRecentEnrollments = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getRecentEnrollments = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
   const db = getDB()
   const { results } = await db
@@ -504,7 +600,7 @@ export const getRecentEnrollments = createServerFn({ method: 'GET', strict: fals
   }))
 })
 
-export const getAdminStudents = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getAdminStudents = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
   const db = getDB()
   const { results } = await db
@@ -547,7 +643,7 @@ export const grantTokens = createServerFn({ method: 'POST' })
       .run()
   })
 
-export const getAdminTransactions = createServerFn({ method: 'GET', strict: false })
+export const getAdminTransactions = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { type?: string })
   .handler(async ({ data }) => {
     await requireAdmin()
@@ -592,7 +688,7 @@ export const deleteTokenPackage = createServerFn({ method: 'POST' })
     await db.prepare('DELETE FROM token_packages WHERE id = ?').bind(data.id).run()
   })
 
-export const getAdminExam = createServerFn({ method: 'GET', strict: false })
+export const getAdminExam = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { categoryId: string })
   .handler(async ({ data }) => {
     await requireAdmin()
@@ -623,57 +719,7 @@ export const upsertExam = createServerFn({ method: 'POST' })
     }
   })
 
-export const getAdminResearch = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  await requireAdmin()
-  const db = getDB()
-  const { results } = await db.prepare('SELECT * FROM research_articles ORDER BY created_at DESC').all<Record<string, unknown>>()
-  return (results ?? []).map((a) => ({ ...a, published: !!a.published, tags: parseJSON(a.tags as string, []) }))
-})
-
-export const upsertResearchArticle = createServerFn({ method: 'POST' })
-  .inputValidator(
-    (d: unknown) =>
-      d as { id?: string; title: string; excerpt: string; content: string; cover_image_url: string; tags: string; published: boolean },
-  )
-  .handler(async ({ data }) => {
-    await requireAdmin()
-    const db = getDB()
-    const slug = data.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-    const tagsJson = JSON.stringify(
-      data.tags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-    )
-    if (data.id) {
-      await db
-        .prepare(
-          `UPDATE research_articles SET title=?,excerpt=?,content=?,cover_image_url=?,tags=?,published=?,updated_at=datetime('now') WHERE id=?`,
-        )
-        .bind(data.title, data.excerpt || null, data.content, data.cover_image_url || null, tagsJson, data.published ? 1 : 0, data.id)
-        .run()
-    } else {
-      await db
-        .prepare(
-          `INSERT INTO research_articles (id,title,slug,excerpt,content,cover_image_url,tags,published) VALUES (?,?,?,?,?,?,?,?)`,
-        )
-        .bind(newId(), data.title, slug, data.excerpt || null, data.content, data.cover_image_url || null, tagsJson, data.published ? 1 : 0)
-        .run()
-    }
-  })
-
-export const deleteResearchArticle = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) => d as { id: string })
-  .handler(async ({ data }) => {
-    await requireAdmin()
-    const db = getDB()
-    await db.prepare('DELETE FROM research_articles WHERE id = ?').bind(data.id).run()
-  })
-
-export const getAdminResources = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getAdminResources = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin()
   const db = getDB()
   const { results } = await db.prepare('SELECT * FROM resources ORDER BY created_at DESC').all()
@@ -706,7 +752,7 @@ export const deleteResource = createServerFn({ method: 'POST' })
     await db.prepare('DELETE FROM resources WHERE id = ?').bind(data.id).run()
   })
 
-export const getStudentDetail = createServerFn({ method: 'GET', strict: false })
+export const getStudentDetail = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { userId: string })
   .handler(async ({ data }) => {
     await requireAdmin()
@@ -758,28 +804,6 @@ export const deleteCategory = createServerFn({ method: 'POST' })
     await db.prepare('DELETE FROM categories WHERE id=?').bind(data.id).run()
   })
 
-// ── COMMUNITY (admin) ────────────────────────────────────────────────────────
-
-export const getCommunityPostsAdmin = createServerFn({ method: 'GET', strict: false }).handler(async () => {
-  await requireAdmin()
-  const db = getDB()
-  const { results } = await db
-    .prepare(
-      `SELECT p.*, u.display_name, u.email FROM community_posts p
-       JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC`,
-    )
-    .all<Record<string, unknown>>()
-  return (results ?? []).map((p) => ({ ...p, author_name: p.display_name, author_email: p.email }))
-})
-
-export const deletePost = createServerFn({ method: 'POST' })
-  .inputValidator((d: unknown) => d as { id: string })
-  .handler(async ({ data }) => {
-    await requireAdmin()
-    const db = getDB()
-    await db.prepare('DELETE FROM community_posts WHERE id=?').bind(data.id).run()
-  })
-
 // ── TRACKS / QUIZ / EXAM ──────────────────────────────────────────────────────
 
 export const submitQuiz = createServerFn({ method: 'POST' })
@@ -793,7 +817,7 @@ export const submitQuiz = createServerFn({ method: 'POST' })
       .run()
   })
 
-export const getQuizResult = createServerFn({ method: 'GET', strict: false })
+export const getQuizResult = createServerFn({ method: 'GET' })
   .inputValidator((d: unknown) => d as { lessonId: string })
   .handler(async ({ data }) => {
     const sid = getCookie('vl_session')

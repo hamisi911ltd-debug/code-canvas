@@ -39,6 +39,7 @@ export function BuyTokens({
   const [checkoutLoaded, setCheckoutLoaded] = useState(false)
   const [sdkReady, setSdkReady] = useState(false)
   const [apiRef, setApiRef] = useState<string | null>(null)
+  const [pendingPayment, setPendingPayment] = useState<Record<string, unknown> | null>(null)
   const intaSendRef = useRef<IntaSend | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const buildPubKey = import.meta.env.VITE_INTASEND_PUBLISHABLE_KEY as string | undefined
@@ -78,6 +79,12 @@ export function BuyTokens({
     observer.observe(el, { childList: true })
     return () => observer.disconnect()
   }, [step])
+
+  useEffect(() => {
+    if (!pendingPayment || step !== 'checkout' || !intaSendRef.current) return
+    intaSendRef.current.run(pendingPayment)
+    setPendingPayment(null)
+  }, [pendingPayment, step])
 
   useEffect(() => {
     if (keyLoading) return
@@ -125,8 +132,7 @@ export function BuyTokens({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [publicAPIKey, keyLoading, devFallbackEnabled])
 
   useEffect(() => {
     if (!open) {
@@ -166,13 +172,12 @@ export function BuyTokens({
       toast.error('Payment checkout is not ready. Please try again in a moment.')
       return
     }
-    setStep('checkout')
 
     const ref = `tokens-${tokens}-${user.id}-${Date.now().toString(36)}`
     setApiRef(ref)
 
     const [firstName, ...lastNameParts] = (user.display_name ?? 'VibeLearn Student').trim().split(/\s+/)
-    intaSendRef.current.run({
+    setPendingPayment({
       amount,
       currency: 'KES',
       email: user.email,
@@ -180,6 +185,7 @@ export function BuyTokens({
       last_name: lastNameParts.join(' ') || firstName,
       api_ref: ref,
     })
+    setStep('checkout')
   }
 
   const { data: statusData } = useQuery({
@@ -203,33 +209,33 @@ export function BuyTokens({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-md max-h-[92vh] overflow-y-auto rounded-2xl p-4 sm:p-6 gap-3 sm:gap-4">
         <DialogHeader>
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary mb-2">
-            <Coins className="h-6 w-6" />
+          <div className="mx-auto grid h-10 w-10 sm:h-12 sm:w-12 place-items-center rounded-2xl bg-primary/10 text-primary mb-1.5 sm:mb-2">
+            <Coins className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-          <DialogTitle className="text-center text-xl">Unlock "{courseTitle}"</DialogTitle>
-          <DialogDescription className="text-center">
+          <DialogTitle className="text-center text-lg sm:text-xl break-words">Unlock "{courseTitle}"</DialogTitle>
+          <DialogDescription className="text-center text-xs sm:text-sm">
             You need {tokens} token{tokens === 1 ? '' : 's'} to enroll — top up to continue.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
+        <div className="rounded-xl border border-border bg-muted/30 p-3 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between text-xs sm:text-sm">
             <span className="text-muted-foreground">
               {tokens} token{tokens === 1 ? '' : 's'} × KES {KES_PER_TOKEN}
             </span>
             <span className="font-mono">KES {amount}</span>
           </div>
           <div className="h-px bg-border" />
-          <div className="flex items-center justify-between font-semibold">
+          <div className="flex items-center justify-between font-semibold text-sm sm:text-base">
             <span>Total due</span>
             <span className="font-mono text-primary">KES {amount}</span>
           </div>
         </div>
 
         {devFallbackEnabled ? (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 sm:p-4 text-xs sm:text-sm text-amber-900">
             <p className="font-semibold">Developer fallback active</p>
             <p className="mt-1">
               `VITE_INTASEND_PUBLISHABLE_KEY` is not configured, so purchases will be granted locally for testing only.
@@ -254,17 +260,17 @@ export function BuyTokens({
           <div
             id={CHECKOUT_CONTAINER_ID}
             ref={containerRef}
-            className="relative min-h-[420px] rounded-xl overflow-hidden bg-[#0d1b2a]"
+            className="relative min-h-[300px] sm:min-h-[420px] max-h-[60vh] sm:max-h-none rounded-xl overflow-hidden bg-[#0d1b2a] [&_iframe]:!w-full [&_iframe]:!max-w-full"
           >
             {!checkoutLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading secure checkout…
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm text-center px-4">
+                <Loader2 className="h-5 w-5 animate-spin mr-2 shrink-0" /> Loading secure checkout…
               </div>
             )}
           </div>
         )}
 
-        <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground text-center">
           <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
           Secure checkout by IntaSend — M-Pesa, card, Apple Pay, Google Pay & more
         </p>

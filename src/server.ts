@@ -19,21 +19,62 @@ async function handleIntaSendWebhook(request: Request): Promise<Response> {
   try {
     payload = await request.json();
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    const text = await request.text();
+    const params = new URLSearchParams(text);
+    if (params.toString()) {
+      const body: Record<string, unknown> = {}
+      for (const [key, value] of params.entries()) {
+        body[key] = value
+      }
+      if (typeof body.payload === 'string') {
+        try {
+          body.payload = JSON.parse(body.payload)
+        } catch {
+          // keep the raw string when payload isn't JSON
+        }
+      }
+      payload = body
+    } else {
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        console.error('IntaSend webhook parsing failed', {
+          contentType: request.headers.get('content-type'),
+          body: text,
+        })
+        return new Response('Invalid webhook payload', { status: 400 })
+      }
+    }
+  }
+
+  if (payload.payload && typeof payload.payload === 'object' && !Array.isArray(payload.payload)) {
+    payload = { ...payload, ...(payload.payload as Record<string, unknown>) }
   }
 
   if (payload.challenge !== undefined) {
     if (!verifyIntaSendWebhook(payload)) {
-      return new Response("Invalid challenge", { status: 401 });
+      return new Response('Invalid challenge', { status: 401 });
     }
-    return new Response(String(payload.challenge), { status: 200 });
+    return new Response(String(payload.challenge), {
+      status: 200,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
   }
 
-  const state = payload.state as string | undefined;
-  const invoiceId = payload.invoice_id as string | undefined;
-  const apiRef = payload.api_ref as string | undefined;
-  if (!invoiceId || !apiRef || (state !== "COMPLETE" && state !== "FAILED")) {
-    return new Response("OK", { status: 200 });
+  const state = (payload.state as string | undefined)?.toUpperCase() ??
+    (payload.status as string | undefined)?.toUpperCase();
+  const invoiceId = (payload.invoice_id as string | undefined) ?? (payload.invoiceId as string | undefined);
+  const apiRef = (payload.api_ref as string | undefined) ?? (payload.apiRef as string | undefined);
+
+  const validState = state === 'COMPLETE' || state === 'COMPLETED' || state === 'FAILED';
+  if (!invoiceId || !apiRef || !validState) {
+    console.info('IntaSend webhook ignored: missing fields or unsupported state', {
+      invoiceId,
+      apiRef,
+      state,
+      payload,
+    });
+    return new Response('OK', { status: 200 });
   }
 
   const parsed = parseApiRef(apiRef);
@@ -134,7 +175,8 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     return runWithCfEnv(env as CfEnv, async () => {
       const url = new URL(request.url);
-      if (url.pathname === "/api/intasend-webhook" && request.method === "POST") {
+      const requestPath = url.pathname.replace(/\/+$/, '');
+      if (requestPath === '/api/intasend-webhook' && request.method === 'POST') {
         try {
           return await handleIntaSendWebhook(request);
         } catch (error) {

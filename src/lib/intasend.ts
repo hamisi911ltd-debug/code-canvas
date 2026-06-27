@@ -13,7 +13,7 @@ export function verifyIntaSendWebhook(payload: { challenge?: unknown }): boolean
 
 // api_ref is generated client-side as `tokens-${tokens}-${userId}-${nonce}`
 export function parseApiRef(apiRef: string): { tokens: number; userId: string } | undefined {
-  const match = /^tokens-(\d+)-([0-9a-f]+)-/.exec(apiRef)
+  const match = /^tokens-(\d+)-([0-9a-f]+)-/i.exec(apiRef)
   if (!match) return undefined
   return { tokens: parseInt(match[1], 10), userId: match[2] }
 }

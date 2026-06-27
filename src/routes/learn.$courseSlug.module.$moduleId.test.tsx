@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { getCourse, getModules, getModuleTest, submitModuleTest } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
-import { Award, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
+import { CelebrationOverlay } from '@/components/Celebration'
+import { Award, CheckCircle2, XCircle, ArrowRight, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/learn/$courseSlug/module/$moduleId/test')({ component: ModuleTestView })
@@ -18,6 +19,7 @@ function ModuleTestView() {
   const navigate = useNavigate()
   const [answers, setAnswers] = useState<(number | null)[]>([])
   const [result, setResult] = useState<{ score: number; passed: boolean } | null>(null)
+  const [celebrating, setCelebrating] = useState(false)
 
   const { data: course } = useQuery({
     queryKey: ['course-full', courseSlug],
@@ -51,11 +53,11 @@ function ModuleTestView() {
   const handleSubmit = () => {
     const correct = answers.filter((a, i) => a === questions[i].answer).length
     const score = questions.length ? Math.round((correct / questions.length) * 100) : 0
-    const passed = score >= (test?.pass_score ?? 70)
+    const passed = score >= (test?.pass_score ?? 80)
     setResult({ score, passed })
     saveMutation.mutate({ score, passed })
-    if (passed) toast.success(`Module test passed! ${score}%`)
-    else toast.error(`${score}% — need ${test?.pass_score ?? 70}% to pass.`)
+    if (passed) setCelebrating(true)
+    else toast.error(`${score}% — need ${test?.pass_score ?? 80}% to pass.`)
   }
 
   if (isLoading || !course) {
@@ -78,6 +80,15 @@ function ModuleTestView() {
   const lessonsOfCourse = ((course.lessons ?? []) as any[]).sort((a, b) => a.position - b.position)
   const nextModuleFirstLesson = nextModule ? lessonsOfCourse.find((l) => l.module_id === nextModule.id) : null
 
+  const proceedAfterCelebration = () => {
+    setCelebrating(false)
+    if (nextModuleFirstLesson) {
+      navigate({ to: '/learn/$courseSlug/$lessonId', params: { courseSlug, lessonId: nextModuleFirstLesson.id } })
+    } else {
+      navigate({ to: '/courses/$slug', params: { slug: courseSlug } })
+    }
+  }
+
   return (
     <PageShell hideFooter>
       <div className="mx-auto max-w-3xl px-4 sm:px-6 py-10">
@@ -89,7 +100,7 @@ function ModuleTestView() {
             <h1 className="font-display text-lg font-bold">{test.title}</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            {questions.length} questions · Pass score: {test.pass_score ?? 70}%
+            {questions.length} questions · Pass score: {test.pass_score ?? 80}%
           </p>
         </div>
 
@@ -149,6 +160,18 @@ function ModuleTestView() {
           </div>
         )}
       </div>
+
+      {celebrating && result?.passed && (
+        <CelebrationOverlay
+          icon={Trophy}
+          big
+          title={`Test passed — ${result.score}%! 🏆`}
+          subtitle={nextModuleFirstLesson ? `Onward to "${nextModule?.title}"` : 'Course complete — nice work!'}
+          ctaLabel={nextModuleFirstLesson ? 'Next module' : 'Back to course'}
+          autoMs={2400}
+          onDone={proceedAfterCelebration}
+        />
+      )}
     </PageShell>
   )
 }

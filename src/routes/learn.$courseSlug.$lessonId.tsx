@@ -2,11 +2,13 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { getCourse, getLessonProgress, markLessonComplete, getModules, getTokenBalance, unlockModule } from '@/server-functions/data'
+import { getCourse, getLessonProgress, markLessonComplete, getModules, getTokenBalance, unlockModule, getModuleUnlockCooldown } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
 import { BuyTokens } from '@/components/BuyTokens'
-import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Check, Lock, Coins } from 'lucide-react'
+import { CelebrationOverlay } from '@/components/Celebration'
+import { LessonIllustration } from '@/components/illustrations/LessonIllustrations'
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Check, Lock, Coins, PartyPopper } from 'lucide-react'
 import { toast } from 'sonner'
 
 export const Route = createFileRoute('/learn/$courseSlug/$lessonId')({ component: LessonView })
@@ -26,6 +28,7 @@ function NoteRenderer({ content }: { content: string }) {
   let ulBuffer: string[] = []
   let olBuffer: { n: number; t: string }[] = []
   let olStart = 1
+  let quoteBuffer: string[] = []
   let key = 0
 
   const inlineFormat = (text: string): ReactNode => {
@@ -77,14 +80,67 @@ function NoteRenderer({ content }: { content: string }) {
       olStart = 1
     }
   }
+  const flushQuote = () => {
+    if (quoteBuffer.length) {
+      const text = quoteBuffer.join('\n').trim()
+      rendered.push(
+        <blockquote key={`bq-${key++}`} className="border-l-4 border-primary/50 bg-primary/[0.04] rounded-r-lg pl-4 pr-3 py-2 my-3 text-sm text-muted-foreground italic">
+          {text.split('\n').filter(Boolean).map((t, i) => <p key={i} className={i > 0 ? 'mt-1.5' : ''}>{inlineFormat(t)}</p>)}
+        </blockquote>,
+      )
+      quoteBuffer = []
+    }
+  }
   const flushLists = () => { flushUl(); flushOl() }
+  const flushAll = () => { flushLists(); flushQuote() }
+
+  const parseTableRow = (line: string) =>
+    line.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'))
+  const isTableSeparator = (line: string) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line)
 
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
+
+    if (line.trim().startsWith('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      flushAll()
+      const header = parseTableRow(line)
+      i += 2
+      const bodyRows: string[][] = []
+      while (i < lines.length && lines[i].trim().startsWith('|')) { bodyRows.push(parseTableRow(lines[i])); i++ }
+      rendered.push(
+        <div key={`table-${key++}`} className="my-4 overflow-x-auto rounded-xl border border-border animate-in fade-in-0 duration-500">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-muted/50">{header.map((h, hi) => <th key={hi} className="text-left font-semibold px-3 py-2 border-b border-border whitespace-nowrap">{inlineFormat(h)}</th>)}</tr></thead>
+            <tbody>
+              {bodyRows.map((row, ri) => (
+                <tr key={ri} className="border-b border-border last:border-0 even:bg-muted/20">
+                  {row.map((cell, ci) => <td key={ci} className="px-3 py-2 align-top">{inlineFormat(cell)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
+    }
+
+    const image = line.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+    if (image) {
+      flushAll()
+      rendered.push(
+        <figure key={`img-${key++}`} className="my-4 animate-in fade-in-0 zoom-in-95 duration-500">
+          <img src={image[2]} alt={image[1] || ''} loading="lazy" className="w-full rounded-xl border border-border object-cover" />
+          {image[1] && <figcaption className="mt-1.5 text-center text-xs text-muted-foreground">{image[1]}</figcaption>}
+        </figure>,
+      )
+      i++
+      continue
+    }
+
     const fence = line.match(/^```(\w*)\s*$/)
     if (fence) {
-      flushLists()
+      flushAll()
       const lang = fence[1]
       const codeLines: string[] = []
       i++
@@ -102,17 +158,17 @@ function NoteRenderer({ content }: { content: string }) {
       continue
     }
 
-    if (line.startsWith('### ')) { flushLists(); rendered.push(<h3 key={i} className="text-base font-bold mt-5 mb-1.5 text-foreground">{line.slice(4)}</h3>) }
-    else if (line.startsWith('## ')) { flushLists(); rendered.push(<h2 key={i} className="text-lg font-bold mt-6 mb-2 text-foreground border-b border-border pb-1">{line.slice(3)}</h2>) }
-    else if (line.startsWith('# ')) { flushLists(); rendered.push(<h1 key={i} className="text-xl font-bold mt-6 mb-2 text-foreground">{line.slice(2)}</h1>) }
-    else if (line.startsWith('- ') || line.startsWith('* ')) { flushOl(); ulBuffer.push(line.slice(2)) }
-    else if (/^(\d+)\.\s/.test(line)) { flushUl(); const m = line.match(/^(\d+)\.\s+(.*)$/)!; const n = Number(m[1]); const txt = m[2]; if (!olBuffer.length) olStart = n; olBuffer.push({ n, t: txt }) }
-    else if (line.startsWith('> ')) { flushLists(); rendered.push(<blockquote key={i} className="border-l-4 border-primary/50 pl-4 my-2 text-sm text-muted-foreground italic">{inlineFormat(line.slice(2))}</blockquote>) }
-    else if (line.trim() === '') { flushLists(); rendered.push(<div key={i} className="h-2" />) }
-    else { flushLists(); rendered.push(<p key={i} className="text-sm leading-relaxed text-foreground/90 my-1">{inlineFormat(line)}</p>) }
+    if (line.startsWith('### ')) { flushAll(); rendered.push(<h3 key={i} className="text-base font-bold mt-5 mb-1.5 text-foreground animate-in fade-in-0 slide-in-from-left-1 duration-300">{inlineFormat(line.slice(4))}</h3>) }
+    else if (line.startsWith('## ')) { flushAll(); rendered.push(<h2 key={i} className="text-lg font-bold mt-6 mb-2 text-foreground border-b border-border pb-1 animate-in fade-in-0 slide-in-from-left-1 duration-300">{inlineFormat(line.slice(3))}</h2>) }
+    else if (line.startsWith('# ')) { flushAll(); rendered.push(<h1 key={i} className="text-xl font-bold mt-6 mb-2 text-foreground animate-in fade-in-0 slide-in-from-left-1 duration-300">{inlineFormat(line.slice(2))}</h1>) }
+    else if (line.startsWith('- ') || line.startsWith('* ')) { flushOl(); flushQuote(); ulBuffer.push(line.slice(2)) }
+    else if (/^(\d+)\.\s/.test(line)) { flushUl(); flushQuote(); const m = line.match(/^(\d+)\.\s+(.*)$/)!; const n = Number(m[1]); const txt = m[2]; if (!olBuffer.length) olStart = n; olBuffer.push({ n, t: txt }) }
+    else if (line.startsWith('> ')) { flushLists(); quoteBuffer.push(line.slice(2)) }
+    else if (line.trim() === '') { if (quoteBuffer.length) quoteBuffer.push(''); else { flushAll(); rendered.push(<div key={i} className="h-2" />) } }
+    else { flushAll(); rendered.push(<p key={i} className="text-sm leading-relaxed text-foreground/90 my-1">{inlineFormat(line)}</p>) }
     i++
   }
-  flushLists()
+  flushAll()
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 sm:p-7">
@@ -127,6 +183,7 @@ function LessonView() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [unlocking, setUnlocking] = useState(false)
+  const [celebrating, setCelebrating] = useState(false)
 
   useEffect(() => { if (!isLoading && !user) navigate({ to: '/auth' }) }, [isLoading, user, navigate])
 
@@ -157,14 +214,23 @@ function LessonView() {
   const balance = tokenBalance ?? 0
   const tokensNeeded = currentModule ? Math.max(0, currentModule.token_cost - balance) : 0
 
+  const { data: cooldown, refetch: refetchCooldown } = useQuery({
+    queryKey: ['module-unlock-cooldown', user?.id],
+    enabled: !!user,
+    queryFn: () => getModuleUnlockCooldown(),
+    refetchInterval: (q) => (q.state.data?.remainingMs ? 30_000 : false),
+  })
+  const cooldownMinutes = cooldown?.remainingMs ? Math.ceil(cooldown.remainingMs / 60000) : 0
+
   const unlockMut = useMutation({
     mutationFn: (moduleId: string) => unlockModule({ data: { moduleId } }),
     onSuccess: () => {
       toast.success('Module unlocked!')
       qc.invalidateQueries({ queryKey: ['modules'] })
       refetchBalance()
+      refetchCooldown()
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to unlock module'),
+    onError: (e: unknown) => { toast.error(e instanceof Error ? e.message : 'Failed to unlock module'); refetchCooldown() },
   })
 
   const { data: completedIds } = useQuery({
@@ -186,16 +252,20 @@ function LessonView() {
   const markDone = useMutation({
     mutationFn: () => markLessonComplete({ data: { lessonId } }),
     onSuccess: () => {
-      toast.success('Lesson complete!')
       qc.invalidateQueries({ queryKey: ['lesson-progress'] })
-      if (nextInModule) {
-        navigate({ to: '/learn/$courseSlug/$lessonId', params: { courseSlug, lessonId: nextInModule.id } })
-      } else if (current?.module_id) {
-        navigate({ to: '/learn/$courseSlug/module/$moduleId/test', params: { courseSlug, moduleId: current.module_id } })
-      }
+      setCelebrating(true)
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
   })
+
+  const proceedAfterCelebration = () => {
+    setCelebrating(false)
+    if (nextInModule) {
+      navigate({ to: '/learn/$courseSlug/$lessonId', params: { courseSlug, lessonId: nextInModule.id } })
+    } else if (current?.module_id) {
+      navigate({ to: '/learn/$courseSlug/module/$moduleId/test', params: { courseSlug, moduleId: current.module_id } })
+    }
+  }
 
   if (!course || !current) {
     return <PageShell><div className="mx-auto max-w-5xl px-4 py-20"><div className="h-96 bg-muted/40 animate-pulse rounded-2xl" /></div></PageShell>
@@ -218,14 +288,20 @@ function LessonView() {
               <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
                 Unlock this module to read its lessons.
               </p>
-              <Button
-                className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={unlockMut.isPending}
-                onClick={() => (tokensNeeded > 0 ? setUnlocking(true) : unlockMut.mutate(currentModule.id))}
-              >
-                <Coins className="h-4 w-4 mr-1.5" />
-                {tokensNeeded > 0 ? `Buy ${tokensNeeded} token${tokensNeeded === 1 ? '' : 's'} & unlock` : `Unlock for ${currentModule.token_cost} token${currentModule.token_cost === 1 ? '' : 's'}`}
-              </Button>
+              {cooldownMinutes > 0 ? (
+                <p className="mt-5 text-sm text-muted-foreground">
+                  Only one new module per hour — you can unlock the next one in <span className="text-primary font-semibold">{cooldownMinutes} minute{cooldownMinutes === 1 ? '' : 's'}</span>.
+                </p>
+              ) : (
+                <Button
+                  className="mt-5 bg-primary text-primary-foreground hover:bg-primary/90"
+                  disabled={unlockMut.isPending}
+                  onClick={() => (tokensNeeded > 0 ? setUnlocking(true) : unlockMut.mutate(currentModule.id))}
+                >
+                  <Coins className="h-4 w-4 mr-1.5" />
+                  {tokensNeeded > 0 ? `Buy ${tokensNeeded} token${tokensNeeded === 1 ? '' : 's'} & unlock` : `Unlock for ${currentModule.token_cost} token${currentModule.token_cost === 1 ? '' : 's'}`}
+                </Button>
+              )}
               <BuyTokens
                 tokens={tokensNeeded}
                 courseTitle={`${(course as any).title} — ${currentModule.title}`}
@@ -239,6 +315,18 @@ function LessonView() {
               {embed && (
                 <div className="mt-6 aspect-video rounded-2xl overflow-hidden border border-border bg-card">
                   <iframe src={embed} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                </div>
+              )}
+
+              {!embed && (
+                <div className="mt-6 animate-in fade-in-0 zoom-in-95 duration-500">
+                  {current.ai_image_url ? (
+                    <div className="rounded-2xl overflow-hidden border border-border">
+                      <img src={current.ai_image_url} alt="" className="w-full max-h-72 object-cover" />
+                    </div>
+                  ) : (
+                    <LessonIllustration categorySlug={(course as any).categories?.slug} seed={idx} />
+                  )}
                 </div>
               )}
 
@@ -310,6 +398,16 @@ function LessonView() {
           })}
         </aside>
       </div>
+
+      {celebrating && (
+        <CelebrationOverlay
+          icon={PartyPopper}
+          title="Lesson complete! 🎉"
+          subtitle={nextInModule ? `Nice work — next up: "${nextInModule.title}"` : "You've finished this module's lessons — time for the test."}
+          ctaLabel={nextInModule ? 'Next lesson' : 'Take the test'}
+          onDone={proceedAfterCelebration}
+        />
+      )}
     </PageShell>
   )
 }

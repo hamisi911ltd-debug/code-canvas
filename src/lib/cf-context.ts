@@ -1,10 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 export type { D1Database }
 
 export interface CfEnv {
   DB: D1Database
+  AI?: Ai
   INTASEND_WEBHOOK_CHALLENGE: string
   ADMIN_EMAIL: string
   [key: string]: unknown

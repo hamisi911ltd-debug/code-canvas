@@ -29,7 +29,7 @@ export const getMpesaPaymentStatus = createServerFn({ method: 'POST' })
     return { status: payment?.status ?? ('pending' as const) }
   })
 
-export const getIntaSendPublishableKey = createServerFn({ method: 'GET', strict: false }).handler(async () => {
+export const getIntaSendPublishableKey = createServerFn({ method: 'GET' }).handler(async () => {
   const env = getCfEnv()
   return {
     key: String(env.VITE_INTASEND_PUBLISHABLE_KEY ?? env.INTASEND_PUBLISHABLE_KEY ?? ''),

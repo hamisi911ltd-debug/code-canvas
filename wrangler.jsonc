@@ -17,6 +17,9 @@
       "database_id": "af74b69a-89a8-4ea5-ab3d-f3edf681f1f9"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "ADMIN_EMAIL": "hamisi.911.ltd@gmail.com"
   }

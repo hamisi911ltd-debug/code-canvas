@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, notFound } from '@tanstack/react-ro
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { getCourse, getEnrollment, getLessonProgress, enroll, getTokenBalance, getCourseExtras, getModules, unlockModule } from '@/server-functions/data'
+import { getCourse, getEnrollment, getLessonProgress, enroll, getTokenBalance, getCourseExtras, getModules, unlockModule, getModuleUnlockCooldown } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -79,6 +79,14 @@ function CourseDetail() {
     queryFn: () => getModules({ data: { courseId: course!.id as string } }),
   })
 
+  const { data: cooldown, refetch: refetchCooldown } = useQuery({
+    queryKey: ['module-unlock-cooldown', user?.id],
+    enabled: !!user,
+    queryFn: () => getModuleUnlockCooldown(),
+    refetchInterval: (q) => (q.state.data?.remainingMs ? 30_000 : false),
+  })
+  const cooldownMinutes = cooldown?.remainingMs ? Math.ceil(cooldown.remainingMs / 60000) : 0
+
   const enrollMut = useMutation({
     mutationFn: () => enroll({ data: { courseId: course!.id as string } }),
     onSuccess: () => {
@@ -98,8 +106,9 @@ function CourseDetail() {
       toast.success('Module unlocked!')
       refetchModules()
       refetchBalance()
+      refetchCooldown()
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to unlock module'),
+    onError: (e: unknown) => { toast.error(e instanceof Error ? e.message : 'Failed to unlock module'); refetchCooldown() },
   })
 
   if (isLoading) return <PageShell><div className="mx-auto max-w-5xl px-4 py-20"><div className="h-96 bg-muted/40 animate-pulse rounded-2xl" /></div></PageShell>
@@ -245,6 +254,10 @@ function CourseDetail() {
                         </div>
                         {m.unlocked ? (
                           <Badge variant="secondary" className="shrink-0">{moduleLessons.length} lesson{moduleLessons.length !== 1 ? 's' : ''}</Badge>
+                        ) : cooldownMinutes > 0 ? (
+                          <Button size="sm" variant="outline" disabled className="shrink-0 gap-1.5">
+                            <Clock className="h-3.5 w-3.5" /> Next module in {cooldownMinutes}m
+                          </Button>
                         ) : (
                           <Button
                             size="sm"

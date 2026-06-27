@@ -7,16 +7,18 @@ import {
   toggleAdmin, grantTokens, getAllCoursesAdmin, getCategories,
   upsertCourse, deleteCourse, getLessons, upsertLesson, deleteLesson,
   getAdminExam, upsertExam, getTokenPackages, upsertTokenPackage,
-  deleteTokenPackage, getAdminTransactions, getAdminResearch,
-  upsertResearchArticle, deleteResearchArticle, getAdminResources,
+  deleteTokenPackage, getAdminTransactions, getAdminResources,
   upsertResource, deleteResource, getStudentDetail,
-  upsertCategory, deleteCategory, getCommunityPostsAdmin, deletePost,
+  upsertCategory, deleteCategory, getModules, upsertModule, deleteModule,
+  getAdminModuleTest, upsertModuleTest, generateLessonImage,
 } from '@/server-functions/data'
 import { PageShell } from '@/components/PageShell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import mammoth from 'mammoth'
+import { docxHtmlToMarkdown } from '@/lib/docx-to-markdown'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
@@ -26,11 +28,11 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import {
-  Plus, Pencil, Trash2, Shield, BookOpen, FlaskConical, FileText, Layers,
+  Plus, Pencil, Trash2, Shield, BookOpen, FileText, Layers,
   ShieldCheck, Coins, BarChart3, Users, Award, TrendingUp,
   CheckCircle2, XCircle, GiftIcon, Package, DollarSign, ChevronDown, ChevronUp,
-  MessageSquare, Upload, Sparkles, Layout, Server, Brain, Cloud, Palette,
-  Play, HelpCircle, Clock, ChevronRight,
+  Upload, Sparkles, Layout, Server, Brain, Cloud, Palette,
+  Play, HelpCircle, Clock, ChevronRight, ImageIcon, RefreshCw,
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 
@@ -69,7 +71,7 @@ function AdminPage() {
             <p className="text-sm text-primary uppercase tracking-wider font-medium">Admin Control Center</p>
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-bold mt-2">Command everything.</h1>
-          <p className="mt-2 text-muted-foreground">Students · Modules · Exams · Payments · Research · Resources · Community</p>
+          <p className="mt-2 text-muted-foreground">Students · Modules · Exams · Payments · Resources</p>
         </div>
       </section>
 
@@ -82,9 +84,7 @@ function AdminPage() {
               <TabsTrigger value="curriculum" className="shrink-0"><BookOpen className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Modules</span></TabsTrigger>
               <TabsTrigger value="exams" className="shrink-0"><Award className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Exams</span></TabsTrigger>
               <TabsTrigger value="payments" className="shrink-0"><Coins className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Payments</span></TabsTrigger>
-              <TabsTrigger value="research" className="shrink-0"><FlaskConical className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Research</span></TabsTrigger>
               <TabsTrigger value="resources" className="shrink-0"><FileText className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Resources</span></TabsTrigger>
-              <TabsTrigger value="community" className="shrink-0"><MessageSquare className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Community</span></TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="overview"><OverviewTab /></TabsContent>
@@ -92,9 +92,7 @@ function AdminPage() {
           <TabsContent value="curriculum"><CurriculumTab /></TabsContent>
           <TabsContent value="exams"><ExamsTab /></TabsContent>
           <TabsContent value="payments"><PaymentsTab /></TabsContent>
-          <TabsContent value="research"><ResearchAdmin /></TabsContent>
           <TabsContent value="resources"><ResourcesAdmin /></TabsContent>
-          <TabsContent value="community"><CommunityAdmin /></TabsContent>
         </Tabs>
       </section>
     </PageShell>
@@ -326,12 +324,25 @@ function ModulesBuilder() {
   const [selectedCourseId, setSelectedCourseId] = useState('')
   const [lessonOpen, setLessonOpen] = useState(false)
   const [editingLesson, setEditingLesson] = useState<any>(null)
-  const [lessonForm, setLessonForm] = useState({ title: '', description: '', video_url: '', content: '', position: 1, duration_minutes: 0 })
+  const [lessonForm, setLessonForm] = useState({ title: '', description: '', video_url: '', content: '', position: 1, duration_minutes: 0, module_id: '' })
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Course-module state (the `modules` table — pacing/unlock units inside a course,
+  // distinct from the "Modules" pane on the left, which is actually categories)
+  const [courseModuleOpen, setCourseModuleOpen] = useState(false)
+  const [editingCourseModule, setEditingCourseModule] = useState<any>(null)
+  const [courseModuleForm, setCourseModuleForm] = useState({ title: '', description: '', position: 1, token_cost: 1 })
+  const [testOpen, setTestOpen] = useState(false)
+  const [testModuleId, setTestModuleId] = useState('')
+  const [testTitle, setTestTitle] = useState('Module Test')
+  const [testQuestions, setTestQuestions] = useState<{ q: string; options: string[]; answer: number }[]>([])
+  const [testPassScore, setTestPassScore] = useState(80)
 
   const { data: modules } = useQuery({ queryKey: ['categories'], queryFn: () => getCategories() })
   const { data: courses } = useQuery({ queryKey: ['admin-courses'], queryFn: () => getAllCoursesAdmin() })
   const { data: lessons } = useQuery({ queryKey: ['admin-lessons', selectedCourseId], enabled: !!selectedCourseId, queryFn: () => getLessons({ data: { courseId: selectedCourseId } }) })
+  const { data: courseModules } = useQuery({ queryKey: ['admin-course-modules', selectedCourseId], enabled: !!selectedCourseId, queryFn: () => getModules({ data: { courseId: selectedCourseId } }) })
+  const { data: existingTest } = useQuery({ queryKey: ['admin-module-test', testModuleId], enabled: !!testModuleId, queryFn: () => getAdminModuleTest({ data: { moduleId: testModuleId } }) })
 
   const unassignedCount = (courses ?? []).filter((c: any) => !c.category_id).length
   const coursesInModule = (courses ?? []).filter((c: any) =>
@@ -365,7 +376,7 @@ function ModulesBuilder() {
 
   // Lesson mutations
   const saveLesson = useMutation({
-    mutationFn: () => upsertLesson({ data: { ...lessonForm, course_id: selectedCourseId, id: editingLesson?.id } }),
+    mutationFn: () => upsertLesson({ data: { ...lessonForm, module_id: lessonForm.module_id || null, course_id: selectedCourseId, id: editingLesson?.id } }),
     onSuccess: () => { toast.success('Lesson saved'); setLessonOpen(false); qc.invalidateQueries({ queryKey: ['admin-lessons'] }) },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
   })
@@ -373,15 +384,61 @@ function ModulesBuilder() {
     mutationFn: (id: string) => deleteLesson({ data: { id } }),
     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['admin-lessons'] }) },
   })
+  const genImage = useMutation({
+    mutationFn: (lessonId: string) => generateLessonImage({ data: { lessonId } }),
+    onSuccess: (res) => { toast.success('Image generated'); setEditingLesson((l: any) => l ? { ...l, ai_image_url: res.ai_image_url } : l); qc.invalidateQueries({ queryKey: ['admin-lessons'] }) },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed to generate image'),
+  })
 
-  const handleDocImport = (e: ChangeEvent<HTMLInputElement>) => {
+  // Course-module mutations
+  const saveCourseModule = useMutation({
+    mutationFn: () => upsertModule({ data: { ...courseModuleForm, course_id: selectedCourseId, id: editingCourseModule?.id } }),
+    onSuccess: () => { toast.success('Module saved'); setCourseModuleOpen(false); qc.invalidateQueries({ queryKey: ['admin-course-modules'] }) },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+  const delCourseModule = useMutation({
+    mutationFn: (id: string) => deleteModule({ data: { id } }),
+    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['admin-course-modules'] }); qc.invalidateQueries({ queryKey: ['admin-lessons'] }) },
+    onError: () => toast.error('Failed to delete module'),
+  })
+
+  // Module-test mutation
+  const saveTest = useMutation({
+    mutationFn: () => upsertModuleTest({ data: { id: (existingTest as any)?.id, moduleId: testModuleId, title: testTitle, questions: testQuestions, passScore: testPassScore } }),
+    onSuccess: () => { toast.success('Test saved'); qc.invalidateQueries({ queryKey: ['admin-module-test'] }) },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  })
+
+  useEffect(() => {
+    if (existingTest) { setTestQuestions((existingTest as any).questions ?? []); setTestPassScore((existingTest as any).pass_score ?? 80); setTestTitle((existingTest as any).title ?? 'Module Test') }
+    else if (testModuleId) { setTestQuestions([]); setTestPassScore(80); setTestTitle('Module Test') }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingTest, testModuleId])
+
+  const handleDocImport = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => { setLessonForm((f) => ({ ...f, content: (ev.target?.result as string) ?? '' })); toast.success(`Imported "${file.name}"`) }
-    reader.onerror = () => toast.error('Failed to read file')
-    reader.readAsText(file)
-    e.target.value = ''
+    const name = file.name.toLowerCase()
+    try {
+      if (name.endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer()
+        const { value: html, messages } = await mammoth.convertToHtml({ arrayBuffer })
+        setLessonForm((f) => ({ ...f, content: docxHtmlToMarkdown(html) }))
+        toast.success(`Imported "${file.name}"`)
+        if (messages.some((m) => m.type === 'warning')) toast.warning('Some Word formatting may not have converted perfectly — double-check the notes below.')
+      } else if (name.endsWith('.doc')) {
+        toast.error("Legacy .doc isn't supported — re-save as .docx (or .txt/.md) and import again.")
+      } else {
+        const text = await file.text()
+        setLessonForm((f) => ({ ...f, content: text }))
+        toast.success(`Imported "${file.name}"`)
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to read file')
+    } finally {
+      e.target.value = ''
+    }
   }
 
   const autoSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -391,8 +448,12 @@ function ModulesBuilder() {
 
   const openNewCourse = () => { setEditingCourse(null); setCourseForm({ title: '', description: '', level: 'beginner', category_id: selectedModuleId === UNASSIGNED ? '' : selectedModuleId, thumbnail_url: '', duration_minutes: 0, token_cost: 1, published: false }); setCourseOpen(true) }
   const openEditCourse = (c: any) => { setEditingCourse(c); setCourseForm({ title: c.title, description: c.description ?? '', level: c.level, category_id: c.category_id ?? '', thumbnail_url: c.thumbnail_url ?? '', duration_minutes: c.duration_minutes ?? 0, token_cost: c.token_cost ?? 0, published: !!c.published }); setCourseOpen(true) }
-  const openNewLesson = () => { setEditingLesson(null); setLessonForm({ title: '', description: '', video_url: '', content: '', position: (lessons?.length ?? 0) + 1, duration_minutes: 0 }); setLessonOpen(true) }
-  const openEditLesson = (l: any) => { setEditingLesson(l); setLessonForm({ title: l.title, description: l.description ?? '', video_url: l.video_url ?? '', content: l.content ?? '', position: l.position, duration_minutes: l.duration_minutes ?? 0 }); setLessonOpen(true) }
+  const openNewLesson = () => { setEditingLesson(null); setLessonForm({ title: '', description: '', video_url: '', content: '', position: (lessons?.length ?? 0) + 1, duration_minutes: 0, module_id: '' }); setLessonOpen(true) }
+  const openEditLesson = (l: any) => { setEditingLesson(l); setLessonForm({ title: l.title, description: l.description ?? '', video_url: l.video_url ?? '', content: l.content ?? '', position: l.position, duration_minutes: l.duration_minutes ?? 0, module_id: l.module_id ?? '' }); setLessonOpen(true) }
+
+  const openNewCourseModule = () => { setEditingCourseModule(null); setCourseModuleForm({ title: '', description: '', position: (courseModules?.length ?? 0) + 1, token_cost: 1 }); setCourseModuleOpen(true) }
+  const openEditCourseModule = (m: any) => { setEditingCourseModule(m); setCourseModuleForm({ title: m.title, description: m.description ?? '', position: m.position, token_cost: m.token_cost ?? 1 }); setCourseModuleOpen(true) }
+  const openTest = (moduleId: string) => { setTestModuleId(moduleId); setTestOpen(true) }
 
   return (
     <div className="space-y-4">
@@ -511,6 +572,30 @@ function ModulesBuilder() {
                 </Button>
               </div>
 
+              {/* Course modules — pacing/unlock units lessons get assigned to */}
+              <div className="mb-5 rounded-xl border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Course Modules <span className="text-muted-foreground/60">(unlock units + tests)</span></span>
+                  <Button size="sm" variant="outline" className="h-6 text-xs" onClick={openNewCourseModule}><Plus className="h-3 w-3 mr-1" />New</Button>
+                </div>
+                {(courseModules ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No modules yet — lessons without a module are always free to read once enrolled.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(courseModules ?? []).map((m: any) => (
+                      <div key={m.id} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs">
+                        <span className="font-medium">{m.position}. {m.title}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5">{m.lesson_count} lesson{m.lesson_count !== 1 ? 's' : ''}</Badge>
+                        <Badge variant="outline" className="text-[10px] px-1.5">{m.token_cost} tok</Badge>
+                        <button onClick={() => openTest(m.id)} className="p-0.5 rounded hover:bg-muted text-purple-400" title="Edit test"><HelpCircle className="h-3 w-3" /></button>
+                        <button onClick={() => openEditCourseModule(m)} className="p-0.5 rounded hover:bg-muted"><Pencil className="h-3 w-3" /></button>
+                        <button onClick={() => { if (confirm('Delete module? Its lessons become unassigned.')) delCourseModule.mutate(m.id) }} className="p-0.5 rounded hover:bg-destructive/20 text-destructive"><Trash2 className="h-3 w-3" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {(lessons ?? []).length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
                   No lessons yet. Add the first lesson to get started.
@@ -524,9 +609,21 @@ function ModulesBuilder() {
                         <div className="font-medium text-sm">{l.title}</div>
                         {l.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{l.description}</div>}
                         <div className="flex flex-wrap gap-2 mt-1.5">
+                          {l.module_id ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-muted text-foreground px-2 py-0.5 rounded-full">
+                              <Layers className="h-2.5 w-2.5" />{(courseModules ?? []).find((m: any) => m.id === l.module_id)?.title ?? 'Module'}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 px-2 py-0.5">No module</span>
+                          )}
                           {l.video_url && (
                             <span className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                               <Play className="h-2.5 w-2.5" />Video
+                            </span>
+                          )}
+                          {l.ai_image_url && (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full">
+                              <ImageIcon className="h-2.5 w-2.5" />Illustrated
                             </span>
                           )}
                           {l.content && (
@@ -652,8 +749,18 @@ function ModulesBuilder() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1.5"><Label>Title</Label><Input value={lessonForm.title} onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })} /></div>
               <div className="col-span-2 space-y-1.5"><Label>Description <span className="text-muted-foreground text-xs">(shown in lesson list)</span></Label><Input value={lessonForm.description} onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })} placeholder="Brief summary…" /></div>
+              <div className="space-y-1.5">
+                <Label>Module <span className="text-muted-foreground text-xs">(unlock unit)</span></Label>
+                <Select value={lessonForm.module_id || 'none'} onValueChange={(v) => setLessonForm({ ...lessonForm, module_id: v === 'none' ? '' : v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (always free)</SelectItem>
+                    {(courseModules ?? []).map((m: any) => <SelectItem key={m.id} value={m.id}>{m.position}. {m.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1.5"><Label>Order</Label><Input type="number" min={1} value={lessonForm.position} onChange={(e) => setLessonForm({ ...lessonForm, position: Number(e.target.value) })} /></div>
-              <div className="space-y-1.5"><Label>Duration (min)</Label><Input type="number" min={0} value={lessonForm.duration_minutes} onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: Number(e.target.value) })} /></div>
+              <div className="col-span-2 space-y-1.5"><Label>Duration (min)</Label><Input type="number" min={0} value={lessonForm.duration_minutes} onChange={(e) => setLessonForm({ ...lessonForm, duration_minutes: Number(e.target.value) })} /></div>
             </div>
 
             {/* Video */}
@@ -663,6 +770,28 @@ function ModulesBuilder() {
                 <span className="text-xs text-muted-foreground">— YouTube or Vimeo URL</span>
               </div>
               <Input value={lessonForm.video_url} onChange={(e) => setLessonForm({ ...lessonForm, video_url: e.target.value })} placeholder="https://youtube.com/watch?v=… or https://vimeo.com/…" />
+            </div>
+
+            {/* AI illustration */}
+            <div className="rounded-lg border border-border p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1"><ImageIcon className="h-3 w-3" />AI Illustration</span>
+                <Button
+                  type="button" size="sm" variant="outline" className="h-7 text-xs gap-1.5"
+                  disabled={!editingLesson?.id || genImage.isPending}
+                  onClick={() => editingLesson?.id && genImage.mutate(editingLesson.id)}
+                >
+                  {genImage.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                  {editingLesson?.ai_image_url ? 'Regenerate' : 'Generate'}
+                </Button>
+              </div>
+              {!editingLesson?.id ? (
+                <p className="text-xs text-muted-foreground">Save the lesson first, then generate its illustration.</p>
+              ) : editingLesson?.ai_image_url ? (
+                <img src={editingLesson.ai_image_url} alt="" className="w-full max-h-48 object-cover rounded-lg border border-border" />
+              ) : (
+                <p className="text-xs text-muted-foreground">No illustration yet — generated from the lesson title via Cloudflare Workers AI.</p>
+              )}
             </div>
 
             {/* Notes / Document */}
@@ -685,7 +814,7 @@ function ModulesBuilder() {
                 value={lessonForm.content}
                 onChange={(e) => setLessonForm({ ...lessonForm, content: e.target.value })}
                 rows={10}
-                placeholder={"# Lesson Title\n\nWrite your notes here. Markdown is supported:\n- **bold text**\n- `inline code`\n- ## section headings\n- > blockquotes\n\nOr click 'Import file' to upload a .txt or .md document."}
+                placeholder={"# Lesson Title\n\nWrite your notes here. Markdown is supported:\n- **bold text**\n- `inline code`\n- ## section headings\n- > blockquotes\n\nOr click 'Import file' to upload a Word (.docx), .txt or .md document."}
               />
               {lessonForm.content && (
                 <div className="text-[10px] text-muted-foreground text-right">
@@ -702,6 +831,64 @@ function ModulesBuilder() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Course-module dialog ── */}
+      <Dialog open={courseModuleOpen} onOpenChange={setCourseModuleOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingCourseModule ? 'Edit module' : 'New course module'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Title</Label><Input value={courseModuleForm.title} onChange={(e) => setCourseModuleForm({ ...courseModuleForm, title: e.target.value })} placeholder="e.g. Module 1 — Vibecoding 101" /></div>
+            <div className="space-y-1.5"><Label>Description</Label><Textarea value={courseModuleForm.description} onChange={(e) => setCourseModuleForm({ ...courseModuleForm, description: e.target.value })} rows={2} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Order</Label><Input type="number" min={1} value={courseModuleForm.position} onChange={(e) => setCourseModuleForm({ ...courseModuleForm, position: Number(e.target.value) })} /></div>
+              <div className="space-y-1.5"><Label>Token cost <span className="text-muted-foreground text-xs">(0 = free)</span></Label><Input type="number" min={0} value={courseModuleForm.token_cost} onChange={(e) => setCourseModuleForm({ ...courseModuleForm, token_cost: Number(e.target.value) })} /></div>
+            </div>
+            <p className="text-xs text-muted-foreground">Learners can unlock at most one new module per hour platform-wide, so keep module sizing deliberate.</p>
+          </div>
+          <DialogFooter><Button onClick={() => saveCourseModule.mutate()} disabled={saveCourseModule.isPending || !courseModuleForm.title.trim()} className="bg-primary text-primary-foreground hover:bg-primary/90">Save module</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Module-test dialog ── */}
+      <Dialog open={testOpen} onOpenChange={setTestOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Module test</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Test title</Label><Input value={testTitle} onChange={(e) => setTestTitle(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Pass score (%)</Label><Input type="number" min={1} max={100} value={testPassScore} onChange={(e) => setTestPassScore(Number(e.target.value))} /></div>
+            </div>
+            <div className="space-y-4">
+              {testQuestions.map((q, qi) => (
+                <div key={qi} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-primary">Q{qi + 1}</span>
+                    <Input value={q.q} onChange={(e) => setTestQuestions((p) => p.map((x, i) => i === qi ? { ...x, q: e.target.value } : x))} placeholder="Question text…" className="flex-1" />
+                    <Button size="icon" variant="ghost" onClick={() => setTestQuestions((p) => p.filter((_, i) => i !== qi))}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {q.options.map((opt, oi) => (
+                      <div key={oi} className="flex items-center gap-2">
+                        <input type="radio" name={`mod-test-correct-${qi}`} checked={q.answer === oi} onChange={() => setTestQuestions((p) => p.map((x, i) => i === qi ? { ...x, answer: oi } : x))} className="accent-primary shrink-0" />
+                        <Input value={opt} onChange={(e) => setTestQuestions((p) => p.map((x, i) => i === qi ? { ...x, options: x.options.map((o, j) => j === oi ? e.target.value : o) } : x))} placeholder={`Option ${String.fromCharCode(65 + oi)}…`} />
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground">Select the radio next to the correct answer.</p>
+                  </div>
+                </div>
+              ))}
+              {testQuestions.length === 0 && <p className="text-sm text-muted-foreground">No questions yet — add at least one so learners can take this module's test.</p>}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setTestQuestions((p) => [...p, { q: '', options: ['', '', '', ''], answer: 0 }])}><Plus className="h-4 w-4 mr-1" />Add question</Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTestOpen(false)}>Close</Button>
+            <Button onClick={() => saveTest.mutate()} disabled={saveTest.isPending || testQuestions.length === 0} className="bg-primary text-primary-foreground hover:bg-primary/90">Save test</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -711,7 +898,7 @@ function ExamsTab() {
   const qc = useQueryClient()
   const [selectedCat, setSelectedCat] = useState('')
   const [questions, setQuestions] = useState<{ q: string; options: string[]; answer: number }[]>([])
-  const [passScore, setPassScore] = useState(70)
+  const [passScore, setPassScore] = useState(80)
   const [examTitle, setExamTitle] = useState('Final Exam')
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: () => getCategories() })
@@ -719,7 +906,7 @@ function ExamsTab() {
 
   useEffect(() => {
     if (exam) { setQuestions((exam as any).questions ?? []); setPassScore((exam as any).pass_score); setExamTitle((exam as any).title) }
-    else { setQuestions([]); setPassScore(70); setExamTitle('Final Exam') }
+    else { setQuestions([]); setPassScore(80); setExamTitle('Final Exam') }
   }, [exam])
 
   const save = useMutation({
@@ -908,65 +1095,6 @@ function TransactionsAdmin() {
   )
 }
 
-/* ── RESEARCH ──────────────────────────────────────────────────────────────── */
-function ResearchAdmin() {
-  const qc = useQueryClient()
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', excerpt: '', content: '', cover_image_url: '', tags: '', published: false })
-
-  const { data: articles } = useQuery({ queryKey: ['admin-research'], queryFn: () => getAdminResearch() })
-
-  const openNew = () => { setEditing(null); setForm({ title: '', excerpt: '', content: '', cover_image_url: '', tags: '', published: false }); setOpen(true) }
-  const openEdit = (a: any) => { setEditing(a); setForm({ title: a.title, excerpt: a.excerpt ?? '', content: a.content, cover_image_url: a.cover_image_url ?? '', tags: (a.tags ?? []).join(', '), published: !!a.published }); setOpen(true) }
-
-  const save = useMutation({
-    mutationFn: () => upsertResearchArticle({ data: { ...form, id: editing?.id } }),
-    onSuccess: () => { toast.success('Saved'); setOpen(false); qc.invalidateQueries({ queryKey: ['admin-research'] }) },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  })
-
-  const del = useMutation({
-    mutationFn: (id: string) => deleteResearchArticle({ data: { id } }),
-    onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['admin-research'] }) },
-  })
-
-  return (
-    <div>
-      <div className="flex justify-end mb-4">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus className="h-4 w-4 mr-1" />New article</Button></DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editing ? 'Edit article' : 'New article'}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5"><Label>Title</Label><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>Excerpt</Label><Textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} /></div>
-              <div className="space-y-1.5"><Label>Cover image URL</Label><Input value={form.cover_image_url} onChange={(e) => setForm({ ...form, cover_image_url: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>Tags (comma separated)</Label><Input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>Content</Label><Textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={10} /></div>
-              <div className="flex items-center justify-between rounded-lg border border-border p-3"><Label>Published</Label><Switch checked={form.published} onCheckedChange={(v) => setForm({ ...form, published: v })} /></div>
-            </div>
-            <DialogFooter><Button onClick={() => save.mutate()} disabled={save.isPending || !form.title.trim() || !form.content.trim()} className="bg-primary text-primary-foreground hover:bg-primary/90">Save</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <div className="space-y-2">
-        {(articles ?? []).map((a: any) => (
-          <div key={a.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2"><span className="font-medium">{a.title}</span>{a.published ? <Badge className="bg-primary/15 text-primary text-xs">Live</Badge> : <Badge className="bg-muted text-xs">Draft</Badge>}</div>
-              <div className="text-xs text-muted-foreground mt-1 truncate">{a.excerpt}</div>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => { if (confirm('Delete?')) del.mutate(a.id) }}><Trash2 className="h-4 w-4" /></Button>
-          </div>
-        ))}
-        {(articles ?? []).length === 0 && <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">No articles yet.</div>}
-      </div>
-    </div>
-  )
-}
-
 /* ── RESOURCES ─────────────────────────────────────────────────────────────── */
 function ResourcesAdmin() {
   const qc = useQueryClient()
@@ -1039,58 +1167,3 @@ function ResourcesAdmin() {
   )
 }
 
-/* ── COMMUNITY ─────────────────────────────────────────────────────────────── */
-function CommunityAdmin() {
-  const qc = useQueryClient()
-  const [search, setSearch] = useState('')
-
-  const { data: posts } = useQuery({ queryKey: ['admin-community-posts'], queryFn: () => getCommunityPostsAdmin() })
-
-  const del = useMutation({
-    mutationFn: (id: string) => deletePost({ data: { id } }),
-    onSuccess: () => { toast.success('Post deleted'); qc.invalidateQueries({ queryKey: ['admin-community-posts'] }) },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  })
-
-  const filtered = (posts ?? []).filter((p: any) =>
-    !search ||
-    (p.title as string).toLowerCase().includes(search.toLowerCase()) ||
-    (p.author_name as string ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.author_email as string ?? '').toLowerCase().includes(search.toLowerCase()),
-  )
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search posts or authors…" className="max-w-sm" />
-        <Badge variant="secondary" className="self-center">{filtered.length} posts</Badge>
-      </div>
-      <div className="space-y-2">
-        {filtered.map((p: any) => (
-          <div key={p.id} className="rounded-xl border border-border bg-card p-4">
-            <div className="flex items-start gap-3">
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary font-bold text-xs">
-                {(p.author_name ?? '?').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">{p.title}</span>
-                  <span className="text-xs text-muted-foreground">by {p.author_name ?? 'Unknown'} ({p.author_email})</span>
-                  <span className="text-xs text-muted-foreground ml-auto shrink-0">
-                    {formatDistanceToNow(new Date(p.created_at as string), { addSuffix: true })}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{p.content}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:text-destructive"
-                onClick={() => { if (confirm('Delete this post?')) del.mutate(p.id as string) }}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-        {filtered.length === 0 && <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">No community posts yet.</div>}
-      </div>
-    </div>
-  )
-}

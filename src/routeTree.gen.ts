@@ -9,27 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ResearchRouteImport } from './routes/research'
 import { Route as LanguagesRouteImport } from './routes/languages'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CoursesRouteImport } from './routes/courses'
-import { Route as CommunityRouteImport } from './routes/community'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ResearchIndexRouteImport } from './routes/research.index'
 import { Route as LanguagesIndexRouteImport } from './routes/languages.index'
 import { Route as CoursesIndexRouteImport } from './routes/courses.index'
-import { Route as ResearchSlugRouteImport } from './routes/research.$slug'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
 import { Route as LearnCourseSlugLessonIdRouteImport } from './routes/learn.$courseSlug.$lessonId'
 import { Route as LearnCourseSlugModuleModuleIdTestRouteImport } from './routes/learn.$courseSlug.module.$moduleId.test'
 
-const ResearchRoute = ResearchRouteImport.update({
-  id: '/research',
-  path: '/research',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LanguagesRoute = LanguagesRouteImport.update({
   id: '/languages',
   path: '/languages',
@@ -43,11 +34,6 @@ const DashboardRoute = DashboardRouteImport.update({
 const CoursesRoute = CoursesRouteImport.update({
   id: '/courses',
   path: '/courses',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CommunityRoute = CommunityRouteImport.update({
-  id: '/community',
-  path: '/community',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -65,11 +51,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResearchIndexRoute = ResearchIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ResearchRoute,
-} as any)
 const LanguagesIndexRoute = LanguagesIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -79,11 +60,6 @@ const CoursesIndexRoute = CoursesIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CoursesRoute,
-} as any)
-const ResearchSlugRoute = ResearchSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ResearchRoute,
 } as any)
 const CoursesSlugRoute = CoursesSlugRouteImport.update({
   id: '/$slug',
@@ -106,16 +82,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
-  '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/languages': typeof LanguagesRouteWithChildren
-  '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
-  '/research/$slug': typeof ResearchSlugRoute
   '/courses/': typeof CoursesIndexRoute
   '/languages/': typeof LanguagesIndexRoute
-  '/research/': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
@@ -123,13 +95,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
-  '/community': typeof CommunityRoute
   '/dashboard': typeof DashboardRoute
   '/courses/$slug': typeof CoursesSlugRoute
-  '/research/$slug': typeof ResearchSlugRoute
   '/courses': typeof CoursesIndexRoute
   '/languages': typeof LanguagesIndexRoute
-  '/research': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
@@ -138,16 +107,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
-  '/community': typeof CommunityRoute
   '/courses': typeof CoursesRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/languages': typeof LanguagesRouteWithChildren
-  '/research': typeof ResearchRouteWithChildren
   '/courses/$slug': typeof CoursesSlugRoute
-  '/research/$slug': typeof ResearchSlugRoute
   '/courses/': typeof CoursesIndexRoute
   '/languages/': typeof LanguagesIndexRoute
-  '/research/': typeof ResearchIndexRoute
   '/learn/$courseSlug/$lessonId': typeof LearnCourseSlugLessonIdRoute
   '/learn/$courseSlug/module/$moduleId/test': typeof LearnCourseSlugModuleModuleIdTestRoute
 }
@@ -157,16 +122,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
-    | '/community'
     | '/courses'
     | '/dashboard'
     | '/languages'
-    | '/research'
     | '/courses/$slug'
-    | '/research/$slug'
     | '/courses/'
     | '/languages/'
-    | '/research/'
     | '/learn/$courseSlug/$lessonId'
     | '/learn/$courseSlug/module/$moduleId/test'
   fileRoutesByTo: FileRoutesByTo
@@ -174,13 +135,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
-    | '/community'
     | '/dashboard'
     | '/courses/$slug'
-    | '/research/$slug'
     | '/courses'
     | '/languages'
-    | '/research'
     | '/learn/$courseSlug/$lessonId'
     | '/learn/$courseSlug/module/$moduleId/test'
   id:
@@ -188,16 +146,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
-    | '/community'
     | '/courses'
     | '/dashboard'
     | '/languages'
-    | '/research'
     | '/courses/$slug'
-    | '/research/$slug'
     | '/courses/'
     | '/languages/'
-    | '/research/'
     | '/learn/$courseSlug/$lessonId'
     | '/learn/$courseSlug/module/$moduleId/test'
   fileRoutesById: FileRoutesById
@@ -206,24 +160,15 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
-  CommunityRoute: typeof CommunityRoute
   CoursesRoute: typeof CoursesRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   LanguagesRoute: typeof LanguagesRouteWithChildren
-  ResearchRoute: typeof ResearchRouteWithChildren
   LearnCourseSlugLessonIdRoute: typeof LearnCourseSlugLessonIdRoute
   LearnCourseSlugModuleModuleIdTestRoute: typeof LearnCourseSlugModuleModuleIdTestRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/research': {
-      id: '/research'
-      path: '/research'
-      fullPath: '/research'
-      preLoaderRoute: typeof ResearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/languages': {
       id: '/languages'
       path: '/languages'
@@ -243,13 +188,6 @@ declare module '@tanstack/react-router' {
       path: '/courses'
       fullPath: '/courses'
       preLoaderRoute: typeof CoursesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/community': {
-      id: '/community'
-      path: '/community'
-      fullPath: '/community'
-      preLoaderRoute: typeof CommunityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -273,13 +211,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/research/': {
-      id: '/research/'
-      path: '/'
-      fullPath: '/research/'
-      preLoaderRoute: typeof ResearchIndexRouteImport
-      parentRoute: typeof ResearchRoute
-    }
     '/languages/': {
       id: '/languages/'
       path: '/'
@@ -293,13 +224,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/courses/'
       preLoaderRoute: typeof CoursesIndexRouteImport
       parentRoute: typeof CoursesRoute
-    }
-    '/research/$slug': {
-      id: '/research/$slug'
-      path: '/$slug'
-      fullPath: '/research/$slug'
-      preLoaderRoute: typeof ResearchSlugRouteImport
-      parentRoute: typeof ResearchRoute
     }
     '/courses/$slug': {
       id: '/courses/$slug'
@@ -350,29 +274,13 @@ const LanguagesRouteWithChildren = LanguagesRoute._addFileChildren(
   LanguagesRouteChildren,
 )
 
-interface ResearchRouteChildren {
-  ResearchSlugRoute: typeof ResearchSlugRoute
-  ResearchIndexRoute: typeof ResearchIndexRoute
-}
-
-const ResearchRouteChildren: ResearchRouteChildren = {
-  ResearchSlugRoute: ResearchSlugRoute,
-  ResearchIndexRoute: ResearchIndexRoute,
-}
-
-const ResearchRouteWithChildren = ResearchRoute._addFileChildren(
-  ResearchRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
-  CommunityRoute: CommunityRoute,
   CoursesRoute: CoursesRouteWithChildren,
   DashboardRoute: DashboardRoute,
   LanguagesRoute: LanguagesRouteWithChildren,
-  ResearchRoute: ResearchRouteWithChildren,
   LearnCourseSlugLessonIdRoute: LearnCourseSlugLessonIdRoute,
   LearnCourseSlugModuleModuleIdTestRoute:
     LearnCourseSlugModuleModuleIdTestRoute,
